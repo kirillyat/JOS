@@ -681,7 +681,7 @@ address_by_fname(const struct Dwarf_Addrs *addrs, const char *fname,
           // To find it, we need to scan both abbreviation table and attribute values.
           // You can read unsigned LEB128 number using dwarf_read_uleb128 function.
           // Attribute value can be obtained using dwarf_read_abbrev_entry function.
-          // LAB 2: Your code here:
+          // LAB 3: Your code here:
         }
         return 0;
       }
