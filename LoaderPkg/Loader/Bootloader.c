@@ -113,7 +113,20 @@ InitGraphics (
   //
   // Hint: Use GetMode/SetMode functions.
   //
-
+  
+  DEBUG((DEBUG_INFO, "Maxmode: %d\n", GraphicsOutput->Mode->MaxMode));
+  for (UINT32 i = 0; i < GraphicsOutput->Mode->MaxMode; i++) {
+    UINTN                                   SizeOfInfo;
+    EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *  Info;
+    GraphicsOutput->QueryMode(GraphicsOutput, i, &SizeOfInfo, &Info);
+    DEBUG((DEBUG_INFO, "Mode %d, ver:%d, HorRes:%d, VertRes:%d, PixelFormat:%d PPScanLine: %d\n", i, Info->Version, Info->HorizontalResolution, Info->VerticalResolution, Info->PixelFormat, Info->PixelsPerScanLine));
+    if (Info->HorizontalResolution >= 1024 &&
+        Info->VerticalResolution   >=  600 &&
+        Info->PixelFormat == PixelBlueGreenRedReserved8BitPerColor) {
+      GraphicsOutput->SetMode(GraphicsOutput, i);
+      break;
+    }
+  }
   //
   // Fill screen with black.
   //
@@ -968,7 +981,7 @@ UefiMain (
   UINTN              EntryPoint;
   VOID               *GateData;
 
-#if 1 ///< Uncomment to await debugging
+#if 0 /// < Uncomment to await debugging
   volatile BOOLEAN   Connected;
   DEBUG ((DEBUG_INFO, "JOS: Awaiting debugger connection\n"));
 
@@ -1013,12 +1026,17 @@ UefiMain (
     FreePool (LoaderParams);
     return Status;
   }
+  
+  IA32_DESCRIPTOR gdtr;
+  AsmReadGdtr(&gdtr);
 
   DEBUG ((
     DEBUG_INFO,
-    "JOS: CR0 - %Lx CR3 - %Lx\n",
+    "JOS: CR0 - %Lx CR3 - %Lx GDTRBase: - %Lx GDTRLimit: - %Lx\n, ",
     (UINT64) AsmReadCr0 (),
-    (UINT64) AsmReadCr3 ()
+    (UINT64) AsmReadCr3 (),
+    (UINT64) gdtr.Base, 
+    (UINT64) gdtr.Limit
     ));
 
   Status = gBS->CreateEvent (
