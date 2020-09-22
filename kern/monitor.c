@@ -5,11 +5,13 @@
 #include <inc/string.h>
 #include <inc/memlayout.h>
 #include <inc/assert.h>
+#include <inc/env.h>
 #include <inc/x86.h>
 
 #include <kern/console.h>
 #include <kern/monitor.h>
 #include <kern/kdebug.h>
+#include <kern/env.h>
 
 #define CMDBUF_SIZE 80 // enough for one VGA text line
 
