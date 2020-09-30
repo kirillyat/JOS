@@ -28,3 +28,4 @@
 /LoaderPkg/ESP
 /LoaderPkg/efibuild.sh
 /LoaderPkg/mtoc-mac64.sha256
+.idea/*
