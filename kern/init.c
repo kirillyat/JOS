@@ -8,6 +8,10 @@
 
 #include <kern/monitor.h>
 #include <kern/console.h>
+#include <kern/env.h>
+#include <kern/trap.h>
+#include <kern/sched.h>
+#include <kern/cpu.h>
 
 pde_t *
 alloc_pde_early_boot(void) {
@@ -61,17 +65,6 @@ early_boot_pml4_init(void) {
   map_addr_early_boot(FBUFFBASE, uefi_lp->FrameBufferBase, uefi_lp->FrameBufferSize);
 }
 
-// Test the stack backtrace function (lab 1 only)
-void
-test_backtrace(int x) {
-  cprintf("entering test_backtrace %d\n", x);
-  if (x > 0)
-    test_backtrace(x - 1);
-  else
-    mon_backtrace(0, 0, 0);
-  cprintf("leaving test_backtrace %d\n", x);
-}
-
 void
 i386_init(void) {
   extern char end[];
@@ -99,12 +92,18 @@ i386_init(void) {
   fb_init();
   cprintf("Framebuffer initialised\n");
 
-  // Test the stack backtrace function (lab 1 only)
-  test_backtrace(5);
+  // user environment initialization functions
+  env_init();
 
-  // Drop into the kernel monitor.
-  while (1)
-    monitor(NULL);
+#ifdef CONFIG_KSPACE
+  // Touch all you want.
+  ENV_CREATE_KERNEL_TYPE(prog_test1);
+  ENV_CREATE_KERNEL_TYPE(prog_test2);
+  ENV_CREATE_KERNEL_TYPE(prog_test3);
+#endif
+
+  // Schedule and run the first user environment!
+  sched_yield();
 }
 
 /*
