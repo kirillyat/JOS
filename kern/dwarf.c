@@ -76,6 +76,17 @@ dwarf_read_abbrev_entry(const void *entry, unsigned form, void *buf,
     case DW_FORM_block2: {
       // Read block of 2-byte length followed by 0 to 65535 contiguous information bytes
       // LAB 2: Your code here:
+      unsigned length = get_unaligned(entry, uint16_t);
+      entry += sizeof(uint16_t);
+      struct Slice slice = {
+          .mem = entry,
+          .len = length,
+      };
+      if (buf) {
+        memcpy(buf, &slice, sizeof(struct Slice));
+      }
+      entry += length;
+      bytes = sizeof(uint16_t) + length;
     } break;
     case DW_FORM_block4: {
       unsigned length = get_unaligned(entry, uint32_t);

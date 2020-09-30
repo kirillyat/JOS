@@ -24,7 +24,8 @@ static struct Command commands[] = {
     {"help", "Display this list of commands", mon_help},
     {"hello", "Display greeting message", mon_hello},
     {"kerninfo", "Display information about the kernel", mon_kerninfo},
-    {"backtrace", "Print stack backtrace", mon_backtrace}};
+    {"backtrace", "Print stack backtrace", mon_backtrace},
+    {"moo", "This kernel does not have Cow Superpower", mon_moo}};
 #define NCOMMANDS (sizeof(commands) / sizeof(commands[0]))
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -42,6 +43,49 @@ int
 mon_hello(int argc, char **argv, struct Trapframe *tf) {
   cprintf("Hello!\n");
   return 0;
+}
+
+int mon_moo(int argc, char **argv, struct Trapframe *tf) {
+    if (argc <= 1 || argv[1][0] != '-') {
+        cprintf("There are no Easter Eggs in this kernel.\n");
+    } else {
+        int count_v = 0;
+        for (int i = 1; i < strlen(argv[1]); i++) {
+            if (argv[1][i] == 'v') {
+                count_v++;
+            }
+        }
+        switch (count_v) {
+            case 0:
+                cprintf("There are no Easter Eggs in this kernel.\n");
+                break;
+            case 1:
+                cprintf("There really are no Easter Eggs in this kernel.\n");
+                break;
+            case 2:
+                cprintf("Didn't I already tell you that there are no Easter Eggs in this kernel?\n");
+                break;
+            case 3:
+                cprintf("Stop it!\n");
+                break;
+            case 4:
+                cprintf("Okay, okay, if I give you an Easter Egg, will you go away?\n");
+                break;
+            case 5:
+                cprintf("All right, you win.\n \n \
+                               /----\\\n \
+                       -------/      \\\n \
+                      /               \\\n \
+                     /                |\n \
+   -----------------/                  --------\\\n \
+   ----------------------------------------------\n");
+                break;
+            default:
+                cprintf("What is it?  It's an elephant being eaten by a snake, of course.\n");
+
+        }
+    }
+    return 0;
 }
 
 int
@@ -67,6 +111,17 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf) {
 int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
   // LAB 2: Your code here.
+  cprintf("Stack backtrace:\n");
+  uint64_t rbp = read_rbp();
+  while (rbp) {
+    uint64_t rip = ((uint64_t *)rbp)[1];
+    struct Ripdebuginfo info;
+    debuginfo_rip(rip, &info);
+
+    cprintf("  rbp %016lx  rip %016lx\n", rbp, rip);
+    cprintf("         %s:%d: %*s+%ld\n", info.rip_file, info.rip_line, info.rip_fn_namelen, info.rip_fn_name, rip - info.rip_fn_addr);
+    rbp = ((uint64_t *)rbp)[0];
+  }
   return 0;
 }
 

@@ -900,7 +900,7 @@ TransitionToKernelMode (
   return EFI_SUCCESS;
 }
 
-/**
+/*1
   Virtual address map transition event to update
   loader params physical addresses to virtual.
 
