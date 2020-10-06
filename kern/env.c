@@ -209,6 +209,9 @@ env_alloc(struct Env **newenv_store, envid_t parent_id) {
   // static int STACK_TOP = 0x2000000;
 #else
 #endif
+
+  e->env_tf.tf_rflags |= FL_IF;
+
   // You will set e->env_tf.tf_rip later.
 
   // commit the allocation
