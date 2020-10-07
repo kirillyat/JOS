@@ -127,6 +127,15 @@ void
 env_init(void) {
   // Set up envs array
   // LAB 3: Your code here.
+  memset(env_array, 0, sizeof(env_array));
+  struct Env *next_env = NULL;
+  for (int i = NENV - 1; i >= 0; i--) {
+    env_array[i].env_link = next_env;
+    env_array[i].env_status = ENV_FREE;
+    next_env = (env_array + i);
+  }
+  env_free_list = next_env;
+  env_init_percpu();
 }
 
 // Load GDT and segment descriptors.
@@ -206,7 +215,11 @@ env_alloc(struct Env **newenv_store, envid_t parent_id) {
   e->env_tf.tf_cs = GD_KT | 0;
 
   // LAB 3: Your code here.
-  // static int STACK_TOP = 0x2000000;
+  static uintptr_t STACK_TOP = 0x2000000;
+  e->env_tf.tf_rsp = STACK_TOP;
+  STACK_TOP -= 2 * PGSIZE;
+
+  e->env_tf.tf_rflags = read_rflags();
 #else
 #endif
   // You will set e->env_tf.tf_rip later.
@@ -222,9 +235,44 @@ env_alloc(struct Env **newenv_store, envid_t parent_id) {
 
 #ifdef CONFIG_KSPACE
 static void
-bind_functions(struct Env *e, struct Elf *elf) {
+bind_functions(struct Env *e, uint8_t *binary) {
   //find_function from kdebug.c should be used
   // LAB 3: Your code here.
+  struct Elf * elf = (struct Elf *)binary;
+  struct Secthdr *section_header = (struct Secthdr *)(binary + elf->e_shoff);
+  size_t sh_num = elf->e_shnum;
+  char * sh_str = (char *)(binary + section_header[elf->e_shstrndx].sh_offset);
+
+  char * strtab = NULL;
+  for (size_t i = 0; i < sh_num; i++) {
+    if (section_header[i].sh_type == ELF_SHT_STRTAB &&
+        !strcmp(".strtab", sh_str + section_header[i].sh_name)) {
+      strtab = (char*)(binary + section_header[i].sh_offset);
+      break;
+    }
+  }
+
+  struct Elf64_Sym * symtab = NULL;
+  size_t sym_num = 0;
+  for (size_t i = 0; i < sh_num; i++) {
+    if (section_header[i].sh_type == ELF_SHT_SYMTAB) {
+      symtab = (struct Elf64_Sym *)(binary + section_header[i].sh_offset);
+      sym_num = section_header[i].sh_size / sizeof(*symtab);
+      break;
+    }
+  }
+
+  for (size_t i = 0; i < sym_num; i++) {
+    if (ELF64_ST_BIND(symtab[i].st_info) == STB_GLOBAL &&
+        ELF64_ST_TYPE(symtab[i].st_info) == STT_OBJECT &&
+        symtab[i].st_size == sizeof(void*)) {
+      uintptr_t addr = find_function(strtab + symtab[i].st_name);
+      if (addr) {
+        cprintf("function name: %s, address: %x\n", strtab+symtab[i].st_name, (unsigned)addr);
+        memcpy((void *)symtab[i].st_value, &addr, sizeof(void *));
+      }
+    }
+  }
 }
 #endif
 
@@ -270,6 +318,29 @@ load_icode(struct Env *e, uint8_t *binary) {
   //  What?  (See env_run() and env_pop_tf() below.)
 
   // LAB 3: Your code here.
+  struct Elf *elf_header = (struct Elf *) binary;
+  if (elf_header->e_magic != ELF_MAGIC) {
+    panic("load_icode: incorrect ELF format");
+  }
+  if (elf_header->e_shentsize != sizeof(struct Secthdr)) {
+    panic("load_icode: file has incorrect section headers size");
+  }
+  if (elf_header->e_phentsize != sizeof (struct Proghdr)) {
+    panic("load_icode: file has incorrect program headers size");
+  }
+  struct Proghdr * program_header = (struct Proghdr *)(binary + elf_header->e_phoff);
+  for (size_t i = 0; i < elf_header->e_phnum; i++) {
+    if (program_header[i].p_type == ELF_PROG_LOAD) {
+      void * src = binary + program_header[i].p_offset;
+      void * dst = (void *)program_header[i].p_va;
+
+      memcpy(dst, src, program_header[i].p_filesz);
+      memset(dst + program_header[i].p_filesz, 0, program_header[i].p_memsz);
+
+    }
+  }
+  e->env_tf.tf_rip = elf_header->e_entry;
+  bind_functions(e, binary);
 }
 
 //
@@ -281,7 +352,14 @@ load_icode(struct Env *e, uint8_t *binary) {
 //
 void
 env_create(uint8_t *binary, enum EnvType type) {
-  // LAB 3: Your code here.
+  // LAB 3: Your code here..
+  struct Env *env_ptr;
+  int result;
+  if ((result = env_alloc(&env_ptr, 0))) {
+    panic("env_alloc: %i", result);
+  }
+  load_icode(env_ptr, binary);
+  env_ptr->env_type = type;
 }
 
 //
@@ -309,6 +387,12 @@ env_destroy(struct Env *e) {
   // If e is currently running on other CPUs, we change its state to
   // ENV_DYING. A zombie environment will be freed the next time
   // it traps to the kernel.
+
+  e->env_status = ENV_DYING; // environment died, long live new environment (not here)!
+  if (e == curenv) {
+    env_free(e); // очистка среды
+    sched_yield(); // вызывается функция, обрабатывающая смену/удаление среды
+  }
 }
 
 #ifdef CONFIG_KSPACE
@@ -414,5 +498,15 @@ env_run(struct Env *e) {
   //	e->env_tf to sensible values.
   //
   // LAB 3: Your code here.
+  if (curenv != NULL) {
+    if (curenv->env_status == ENV_RUNNING) {
+      curenv->env_status = ENV_RUNNABLE;
+    }
+  }
+  curenv = e;
+  curenv->env_status = ENV_RUNNING;
+  curenv->env_runs++;
+
+  env_pop_tf(&curenv->env_tf);
   while(1) {}
 }
