@@ -93,7 +93,7 @@ ASM_PFX(CallKernelThroughGateAsm):
     ; LAB 2: Your code here:
     
     mov ecx, cr0
-    btr ecx, 31
+    btr ecx, 31; Disable paging
     mov cr0, ecx
 
     ; 2. Switch to our GDT that supports 64-bit mode and update CS to LINEAR_CODE_SEL.
@@ -117,8 +117,8 @@ AsmWithOurGdt:
     ; This may already be enabled by the firmware but is not guaranteed.
     ; LAB 2: Your code here:
     mov eax, cr4
-    bts eax, 5; PAE
-    bts eax, 7; PGE
+    bts eax, 5; PAE (Physical Address Extension)
+    bts eax, 7; PGE (Page Global Enable)
     mov cr4, eax
 
     ; 5. Update page table address register (C3) right away with the supplied PAGE_TABLE.
@@ -138,7 +138,7 @@ AsmWithOurGdt:
     ; 7. Enable paging as it is required in 64-bit mode.
     ; LAB 2: Your code here:
     mov eax, cr0
-    bts eax, 31
+    bts eax, 31; Enable paging
     mov cr0, eax
 
     ; 8. Transition to 64-bit mode by updating CS with LINEAR_CODE64_SEL.
