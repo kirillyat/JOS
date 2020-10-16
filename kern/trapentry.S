@@ -8,9 +8,9 @@
 
 #ifdef CONFIG_KSPACE
 .comm intr_ret_rip, 8
-.comm intr_rbp_reg, 8
 .comm intr_rsp_reg, 8
 .comm intr_cs, 8
+.comm intr_ss, 8
 .comm intr_rflags, 8
 #endif
 
@@ -24,16 +24,15 @@ clock_thdlr:
   popq intr_ret_rip(%rip)
   popq intr_cs(%rip)
   popq intr_rflags(%rip)
-  movq %rbp, intr_rbp_reg(%rip)
-  movq %rsp, intr_rsp_reg(%rip)
-  movq $0x0,%rbp
+  popq intr_rsp_reg(%rip)
+  popq intr_ss(%rip)
   leaq bootstacktop(%rip),%rsp
-  pushq $GD_KD
+  pushq intr_ss(%rip)
   pushq intr_rsp_reg(%rip)
   pushq intr_rflags(%rip)
   pushq intr_cs(%rip)
   pushq intr_ret_rip(%rip)
-  pushq $0
+  pushq $0x0
   pushq $(IRQ_OFFSET + IRQ_CLOCK)
   pushq $0x0 // %ds
   pushq $0x0 // %es
@@ -42,7 +41,7 @@ clock_thdlr:
   pushq %rbx
   pushq %rcx
   pushq %rdx
-  pushq intr_rbp_reg(%rip)
+  pushq %rbp
   pushq %rdi
   pushq %rsi
   pushq %r8
@@ -54,6 +53,7 @@ clock_thdlr:
   pushq %r14
   pushq %r15
 
+  xorl %ebp, %ebp
   movq %rsp,%rdi
   call trap
   jmp .
