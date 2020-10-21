@@ -8,6 +8,8 @@
 #include <inc/memlayout.h>
 
 typedef int32_t envid_t;
+extern pml4e_t *kern_pml4e;
+extern physaddr_t kern_cr3;
 
 // An environment ID 'envid_t' has three parts:
 //
