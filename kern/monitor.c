@@ -14,6 +14,7 @@
 #include <kern/tsc.h>
 #include <kern/timer.h>
 #include <kern/env.h>
+#include <kern/pmap.h>
 
 #define CMDBUF_SIZE 80 // enough for one VGA text line
 
@@ -26,6 +27,8 @@ struct Command {
 
 // LAB 5: Your code here.
 // Implement timer_start (mon_start), timer_stop (mon_stop), timer_freq (mon_frequency) commands.
+// LAB 6: Your code here.
+// Implement memory (mon_memory) command.
 static struct Command commands[] = {
     {"help", "Display this list of commands", mon_help},
     {"hello", "Display greeting message", mon_hello},
@@ -78,6 +81,10 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf) {
 
 // LAB 5: Your code here.
 // Implement timer_start (mon_start), timer_stop (mon_stop), timer_freq (mon_frequency) commands.
+
+// LAB 6: Your code here.
+// Implement memory (mon_memory) commands.
+
 
 /***** Kernel monitor command interpreter *****/
 
