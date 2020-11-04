@@ -56,8 +56,8 @@ typedef struct {
 
 typedef struct {
   ACPISDTHeader h;
-  uint32_t PointerToOtherSDT[];
-} RSDT;
+  uint64_t PointerToOtherSDT[];
+} XSDT;
 
 typedef struct {
   uint8_t address_space_id;

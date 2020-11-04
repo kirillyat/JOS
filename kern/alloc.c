@@ -5,11 +5,14 @@
 
 #define SPACE_SIZE 5 * 0x1000
 
+//Кусок пустого места под динамическую память и в конце заголовок пустого блока.
 static uint8_t space[SPACE_SIZE];
 static Header base = {.s = {.next = (Header *)space, .prev = (Header *)space, .size = 0}}; /* empty list to get started */
 
 static Header *freep = NULL; /* start of free list */
 
+
+//проверяет правильность построения списка. Каждый следующий блок существует и указывает на предыдущий.
 static void
 check_list(void) {
   Header *p, *prevp;
@@ -34,9 +37,13 @@ test_alloc(uint8_t nbytes) {
 
   // Make allocator thread-safe with the help of spin_lock/spin_unlock.
   // LAB 5: Your code here.
-
-  nunits = (nbytes + sizeof(Header) - 1) / sizeof(Header) + 1;
-
+  // ............................................................freep\/
+  // [hdr.]-------------------------------------------------[base]||
+  nunits = (nbytes + sizeof(Header) - 1) / sizeof(Header) + 1; //подгоняем под целое число headerов, чтобы все заголовки были выровнены;
+  
+  spin_lock(&kernel_lock);//Блокируем 
+  //если еще нет списка свободных блоков, создаем свободный блок размером во всю память(его заголовок вначале)
+  //Его указатели указывают на последний служебный блок. Список закольцевался. Получился двусвязный. Кольцевой. Список.
   if (freep == NULL) { /* no free list yet */
     ((Header *)&space)->s.next = (Header *)&base;
     ((Header *)&space)->s.prev = (Header *)&base;
@@ -50,17 +57,18 @@ test_alloc(uint8_t nbytes) {
     if (p->s.size >= nunits) { /* big enough */
       freep = p->s.prev;
       if (p->s.size == nunits) { /* exactly */
-        (p->s.prev)->s.next = p->s.next;
+        (p->s.prev)->s.next = p->s.next;//выключаем блок из списка.
         (p->s.next)->s.prev = p->s.prev;
-      } else { /* allocate tail end */
-        p->s.size -= nunits;
-        p += p->s.size;
-        p->s.size = nunits;
+      } else { /* allocate tail end. */
+        p->s.size -= nunits;//откусываем память от блока сзади
+        p += p->s.size;// переходим на новый блок
+        p->s.size = nunits;//не ставим ему указатели, потому он не должен быть в списке
       }
       spin_unlock(&kernel_lock);
       return (void *)(p + 1);
     }
     if (p == freep) { /* wrapped around free list */
+      spin_unlock(&kernel_lock);
       return NULL;
     }
   }
@@ -70,11 +78,12 @@ test_alloc(uint8_t nbytes) {
 void
 test_free(void *ap) {
   Header *bp, *p;
-  bp = (Header *)ap - 1; /* point to block header */
+  bp = (Header *)ap - 1; /* point to block header который хотим удалить */
 
   // Make allocator thread-safe with the help of spin_lock/spin_unlock.
   // LAB 5: Your code here.
-
+  spin_lock(&kernel_lock);
+  // Хотим чтобы блоки в списке были в порядке расположения в памяти. Ищем два свободных блока слева и справа
   for (p = freep; !(bp > p && bp < p->s.next); p = p->s.next)
     if (p >= p->s.next && (bp > p || bp < p->s.next))
       break;                                                 /* freed block at start or end of arena */
@@ -99,4 +108,5 @@ test_free(void *ap) {
   freep = p;
 
   check_list();
+  spin_unlock(&kernel_lock);
 }
