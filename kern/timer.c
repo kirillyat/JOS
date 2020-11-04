@@ -89,33 +89,81 @@ acpi_enable(void) {
   }
 }
 
-// Obtain RSDP ACPI table address from bootloader.
-RSDP *
-get_rsdp(void) {
-  static void *krsdp = NULL;
-
-  if (krsdp != NULL)
-    return krsdp;
-
-  if (uefi_lp->ACPIRoot == 0)
-    panic("No rsdp\n");
-
-  krsdp = mmio_map_region(uefi_lp->ACPIRoot, sizeof(RSDP));
-  return krsdp;
-}
-
 // LAB 5: Your code here.
+void * acpi_find_table(const char * sign) {
+  static XSDT * kxsdt = NULL;
+  static size_t kxsdt_len = 0;
+  static size_t kxsdt_entsz = 0;
+ 
+  // uint8_t cksm = 0;
+
+  if (!kxsdt) {
+    if (!uefi_lp->ACPIRoot) {
+      panic("No rsdp\n");
+    }
+    RSDP * krsdp = mmio_map_region(uefi_lp->ACPIRoot, sizeof(*krsdp));
+
+    if (strncmp(krsdp->Signature, "RSD PTR ", sizeof(krsdp->Signature))) {
+      panic("RSDP signature invalid.\n");
+    }
+    if (krsdp->Revision == 0) {
+      panic("ACPI Revision 1.0 not supported.\n");
+    }
+    if (!check_sum(krsdp, 0)) {
+      panic("RSDP checksum invalid.\n");
+    }
+    uint64_t xsdt_pa = krsdp->XsdtAddress;
+    kxsdt_entsz = 8;
+
+    kxsdt = mmio_map_region(xsdt_pa, sizeof(*kxsdt));
+    kxsdt = mmio_map_region(xsdt_pa, kxsdt->h.Length);
+
+    kxsdt_len = (kxsdt->h.Length - sizeof(*kxsdt)) / 8;
+
+    if (!check_sum(kxsdt, 1)) {
+      panic("XSDT checksum invalid");
+    }
+  }
+
+  ACPISDTHeader * hd = NULL;
+
+  for (size_t i = 0; i < kxsdt_len; i++) {
+    uint64_t table_pa = 0;
+    memcpy(&table_pa, (uint8_t *)kxsdt->PointerToOtherSDT + i * kxsdt_entsz, kxsdt_entsz);
+
+    hd = mmio_map_region(table_pa, sizeof(ACPISDTHeader));
+    hd = mmio_map_region(table_pa, hd->Length);
+
+    if (!strncmp(hd->Signature, sign, 4)) {
+      if (!check_sum(hd, 1)) {
+        panic("%.*s checksum invalid", 4, hd->Signature);
+      }
+      return hd;
+    }
+  }
+
+  return NULL;
+}
+// LAB 5: My your code
 // Obtain and map FADT ACPI table address.
 FADT *
 get_fadt(void) {
-  return NULL;
+  static FADT *kfadt = NULL;
+  if (!kfadt) {
+    kfadt = acpi_find_table("FACP");
+  }
+  return kfadt;
 }
 
 // LAB 5: Your code here.
 // Obtain and map RSDP ACPI table address.
 HPET *
 get_hpet(void) {
-  return NULL;
+  static HPET *khpet = NULL;
+  if (!khpet) {
+    khpet = acpi_find_table("HPET");
+  }
+  return khpet;
 }
 
 // Getting physical HPET timer address from its table.
@@ -212,12 +260,40 @@ hpet_get_main_cnt(void) {
 // Hint: to be able to use HPET as PIT replacement consult
 // LegacyReplacement functionality in HPET spec.
 
+#define HPET_GLOBAL_ENABLE_CNF 1ULL;
+#define HPET_GLOBAL_LEGACY_REPLACEMENT_BIT (1ULL << 1);
+
+#define HPET_TIM_INT_TYPE_CNF (1ULL << 1)//edge(0) or level(1) triggered interrupts. We need edge, as we configured 8259A in picirq.c
+#define HPET_TIM_VAL_SET_CNF (1ULL << 6)//set this before setting comparator. Cleared avvtomaticaly with comparator setting
+#define HPET_TIM_INT_ENABLE_CNF (1ULL << 2)//enable interrupts from timer
+#define HPET_TIM_TYPE_CNF (1ULL << 3)//non-periodic(0) or periodic(1) interrupts mode
+
+
+#define HPET_TN_TYPE_CNF (1 << 3)
+#define HPET_TN_INT_ENB_CNF (1 << 2)
+#define HPET_TN_VAL_SET_CNF (1 << 6)
+#define HPET_LEG_RT_CNF (1 << 1)
+
 void
 hpet_enable_interrupts_tim0(void) {
+  hpetReg->GEN_CONF &= ~HPET_GLOBAL_ENABLE_CNF; //Halt the main counter
+  hpetReg->GEN_CONF |= HPET_GLOBAL_LEGACY_REPLACEMENT_BIT; //obvious
+  hpetReg->MAIN_CNT = 0ULL; //Reset the main counter
+  hpetReg->TIM0_CONF = HPET_TIM_INT_ENABLE_CNF | HPET_TIM_TYPE_CNF | HPET_TIM_VAL_SET_CNF;
+  hpetReg->TIM0_COMP = hpetFreq / 2; //[Hz]*[sec] = [ticks/sec]*[sec] = [ticks]
+  irq_setmask_8259A(irq_mask_8259A & ~(1 << IRQ_TIMER));
+  hpetReg->GEN_CONF |= HPET_GLOBAL_ENABLE_CNF; //Restart the main timer
 }
 
 void
 hpet_enable_interrupts_tim1(void) {
+  hpetReg->GEN_CONF &= ~HPET_GLOBAL_ENABLE_CNF; //Halt the main counter
+  hpetReg->GEN_CONF |= HPET_GLOBAL_LEGACY_REPLACEMENT_BIT; //obvious
+  hpetReg->MAIN_CNT = 0ULL; //Reset the main counter
+  hpetReg->TIM1_CONF = HPET_TIM_INT_ENABLE_CNF | HPET_TIM_TYPE_CNF | HPET_TIM_VAL_SET_CNF;
+  hpetReg->TIM1_COMP = hpetFreq * 3 / 2; //[Hz]*[sec] = [ticks/sec]*[sec] = [ticks]
+  irq_setmask_8259A(irq_mask_8259A & ~(1 << IRQ_CLOCK));
+  hpetReg->GEN_CONF |= HPET_GLOBAL_ENABLE_CNF; //Restart the main timer
 }
 
 void
@@ -236,7 +312,18 @@ hpet_handle_interrupts_tim1(void) {
 // about pause instruction.
 uint64_t
 hpet_cpu_frequency(void) {
-  return 0;
+  uint64_t time_res = 100;
+  uint64_t target_delta = hpetFreq / time_res;
+
+  uint64_t start_hpet = hpet_get_main_cnt();
+  uint64_t start_tsc  = read_tsc();
+  do {
+    asm("pause");
+  } while (hpet_get_main_cnt() - start_hpet < target_delta);
+  
+  uint64_t end_tsc = read_tsc();
+
+  return (end_tsc - start_tsc) * time_res;
 }
 
 uint32_t
@@ -253,5 +340,24 @@ pmtimer_get_timeval(void) {
 // can be 24-bit or 32-bit.
 uint64_t
 pmtimer_cpu_frequency(void) {
-  return 0;
+  uint64_t time_res = 100;
+  uint64_t target_delta = PM_FREQ / time_res;
+  uint64_t mid_pm = 0, delta = 0;
+  uint64_t start_pm  = pmtimer_get_timeval();
+  uint64_t start_tsc = read_tsc();
+  do {
+    asm("pause");
+    mid_pm = pmtimer_get_timeval();
+    if (start_pm <= mid_pm) {
+      delta = mid_pm - start_pm;
+    } else if (start_pm - mid_pm <= 0x00FFFFFF) {
+      delta = 0x00FFFFFF - start_pm + mid_pm;
+    } else {
+      delta = 0xFFFFFFFF - start_pm + mid_pm;
+    }
+  } while (delta < target_delta);
+  
+  uint64_t end_tsc = read_tsc();
+
+  return (end_tsc - start_tsc) * time_res;
 }
