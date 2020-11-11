@@ -269,6 +269,12 @@ env_alloc(struct Env **newenv_store, envid_t parent_id) {
 
   // You will set e->env_tf.tf_rip later.
 
+  // Clear the page fault handler until user installs one.
+  e->env_pgfault_upcall = 0;
+
+  // Also clear the IPC receiving flag.
+  e->env_ipc_recving = 0;
+
   // commit the allocation
   env_free_list = e->env_link;
   *newenv_store = e;
@@ -393,6 +399,18 @@ load_icode(struct Env *e, uint8_t *binary) {
   // LAB 3: Your code here.
   // LAB 8: Your code here.
 
+  // LAB 8: One more hint for implementing sanitizers.
+#ifdef SANITIZE_USER_SHADOW_BASE
+  cprintf("Allocating shadow base %p:%p\n", (void *)(SANITIZE_USER_SHADOW_BASE), (void *)(SANITIZE_USER_SHADOW_BASE + SANITIZE_USER_SHADOW_SIZE));
+  region_alloc(e, (void *)SANITIZE_USER_SHADOW_BASE, SANITIZE_USER_SHADOW_SIZE);
+  // Our stack and pagetables are special, as they use higher addresses, so they gets a separate shadow.
+  cprintf("Allocating shadow ustack %p:%p\n", (void *)(SANITIZE_USER_STACK_SHADOW_BASE), (void *)(SANITIZE_USER_STACK_SHADOW_BASE + SANITIZE_USER_STACK_SHADOW_SIZE));
+  region_alloc(e, (void *)SANITIZE_USER_STACK_SHADOW_BASE, SANITIZE_USER_STACK_SHADOW_SIZE);
+  cprintf("Allocating shadow uextra %p:%p\n", (void *)(SANITIZE_USER_EXTRA_SHADOW_BASE), (void *)(SANITIZE_USER_EXTRA_SHADOW_BASE + SANITIZE_USER_EXTRA_SHADOW_SIZE));
+  region_alloc(e, (void *)SANITIZE_USER_EXTRA_SHADOW_BASE, SANITIZE_USER_EXTRA_SHADOW_SIZE);
+  cprintf("Allocating shadow vpt %p:%p\n", (void *)(SANITIZE_USER_VPT_SHADOW_BASE), (void *)(SANITIZE_USER_VPT_SHADOW_BASE + SANITIZE_USER_VPT_SHADOW_SIZE));
+  uvpt_shadow_map(e);
+#endif
 }
 
 //
