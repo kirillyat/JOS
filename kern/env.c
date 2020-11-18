@@ -343,7 +343,9 @@ load_icode(struct Env *e, uint8_t *binary) {
     }
   }
   e->env_tf.tf_rip = elf_header->e_entry;
+#ifdef CONFIG_KSPACE
   bind_functions(e, binary);
+#endif
 }
 
 //
