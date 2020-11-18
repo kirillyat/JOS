@@ -36,26 +36,27 @@ rtc_init(void) {
   // LAB 4: Your code here
 
   //configure rtc divider so that interrupts come 2 times a second
-  outb(IO_RTC_CMND, NMI_LOCK | RTC_AREG);
-  uint8_t areg = inb(IO_RTC_DATA);
-  areg = (areg & 0xF0) | 15;
-  outb(IO_RTC_CMND, NMI_LOCK | RTC_AREG);
-  outb(IO_RTC_DATA, areg);
+  outb(IO_RTC_CMND, NMI_LOCK | RTC_AREG); //говорим CMOS, что выбираем регистр А
+  uint8_t areg = inb(IO_RTC_DATA);        //чтение из порта 71 содержимого в регистре А
+  //areg = (areg & 0xF0) | 15;              //побитовое или с 15, то есть прерывание каждые 500 мс, старшие биты оставляем
+  outb(IO_RTC_CMND, NMI_LOCK | RTC_AREG); //говорим CMOS, что выбираем регистр А
+  outb(IO_RTC_DATA, areg);                //вывод в порт 71 содержимого регистра А
 
   //enable RTC periodical interrupts(IRQ 8)
-  outb(IO_RTC_CMND, NMI_LOCK | RTC_BREG);
-  uint8_t breg = inb(IO_RTC_DATA);
-  breg |= RTC_PIE;
-  outb(IO_RTC_CMND, NMI_LOCK | RTC_BREG);
-  outb(IO_RTC_DATA, breg);
+  outb(IO_RTC_CMND, NMI_LOCK | RTC_BREG); //говорим CMOS, что выбираем регистр B
+  uint8_t breg = inb(IO_RTC_DATA);        //чтение из порта 71 содержимого в регистре B
+  breg |= RTC_PIE;                        //установка бита RTC_PIE в регистре B, разрешение периодических прерываний
+  outb(IO_RTC_CMND, NMI_LOCK | RTC_BREG); //говорим CMOS, что выбираем регистр B
+  outb(IO_RTC_DATA, breg);                //вывод в порт 71 содержимого регистра B 
 
-  nmi_enable();//not sure if I need it;
+  nmi_enable();
 }
 
 uint8_t
 rtc_check_status(void) {
   uint8_t status = 0;
   // LAB 4: Your code here
+  // прочитать значение регистра часов C
   outb(IO_RTC_CMND, (inb(IO_RTC_CMND) & NMI_LOCK) | RTC_CREG);
   status = inb(IO_RTC_DATA);
   return status;

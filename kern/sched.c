@@ -24,7 +24,7 @@ sched_yield(void) {
   // below to halt the cpu.
 
   // LAB 3: Your code here.
-  int id = -1;
+  int id = 0;
   if (curenv) {
     id = ENVX(curenv_getid());
   }
