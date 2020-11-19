@@ -375,6 +375,7 @@ page_init(void) {
       pages[i].pp_link = NULL;
     }
   }
+  page_free_list_top = last;
 }
 
 //
