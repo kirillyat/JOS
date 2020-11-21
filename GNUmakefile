@@ -62,7 +62,7 @@ OBJCOPY	:= llvm/gnu-objcopy
 OBJDUMP	:= llvm-objdump
 NM	:= llvm-nm
 
-EXTRA_CFLAGS	:= $(EXTRA_CFLAGS) -Wno-self-assign -Wno-format-nonliteral -Wno-address-of-packed-member
+EXTRA_CFLAGS	:= $(EXTRA_CFLAGS) -Wno-self-assign -Wno-format-nonliteral -Wno-address-of-packed-member -Wno-frame-address
 
 GCC_LIB := $(shell $(CC) $(CFLAGS) -print-resource-dir)/lib/jetos/libclang_rt.builtins-x86_64.a
 
@@ -254,10 +254,10 @@ CFLAGS += -DGRADE3_PFX2=$(GRADE3_PFX2)
 endif
 
 # Common linker flags
-LDFLAGS := -m elf_x86_64 -z max-page-size=0x1000 --print-gc-sections
+LDFLAGS := -m elf_x86_64 -z max-page-size=0x1000 --print-gc-sections --warn-common
 
 # Linker flags for JOS programs
-ULDFLAGS := -T user/user.ld
+ULDFLAGS := -T user/user.ld --warn-common
 
 # Lists that the */Makefrag makefile fragments will add to
 OBJDIRS :=
