@@ -239,6 +239,14 @@ sys_ipc_recv(void *dstva) {
   return -1;
 }
 
+// Return date and time in UNIX timestamp format: seconds passed
+// from 1970-01-01 00:00:00 UTC.
+static int
+sys_gettime(void) {
+  // LAB 12: Your code here.
+  return 0;
+}
+
 // Dispatches to the correct kernel function, passing the arguments.
 uintptr_t
 syscall(uintptr_t syscallno, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4, uintptr_t a5) {
