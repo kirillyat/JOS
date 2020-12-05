@@ -85,6 +85,8 @@ void PLATFORM_ASAN_DEBUG_BREAK();
         (p) = (uintptr_t)__builtin_extract_return_addr((void *)(p));                   \
         PLATFORM_ASAN_PRINTF("%02d: 0x%08lx\n", (x), (long)(p));                       \
       }                                                                                \
+    } else {                                                                           \
+      (p) = 0;                                                                         \
     }                                                                                  \
   } while (0)
 #else

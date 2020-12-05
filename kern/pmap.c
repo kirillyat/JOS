@@ -723,7 +723,7 @@ page_lookup(pml4e_t *pml4e, void *va, pte_t **pte_store) {
   // LAB 7:
   pte_t * pte = pml4e_walk(pml4e, va, 0);
   if (pte && (*pte & PTE_P)) {
-    if (*pte_store) {
+    if (pte_store) {
       *pte_store = pte;
     }
     return pa2page(PTE_ADDR(*pte));
