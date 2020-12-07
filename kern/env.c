@@ -132,12 +132,12 @@ void
 env_init(void) {
   // Set up envs array
   // LAB 3: Your code here.
-  memset(env_array, 0, sizeof(env_array));
+  memset(envs, 0, NENV * sizeof(*envs));
   struct Env *next_env = NULL;
   for (int i = NENV - 1; i >= 0; i--) {
-    env_array[i].env_link = next_env;
-    env_array[i].env_status = ENV_FREE;
-    next_env = (env_array + i);
+    envs[i].env_link = next_env;
+    envs[i].env_status = ENV_FREE;
+    next_env = (envs + i);
   }
   env_free_list = next_env;
   env_init_percpu();
@@ -202,6 +202,13 @@ env_setup_vm(struct Env *e) {
   //    - The functions in kern/pmap.h are handy.
 
   // LAB 8: Your code here.
+
+  p->pp_ref++;
+  e->env_pml4e = page2kva(p);
+  e->env_cr3 = page2pa(p);
+  
+  e->env_pml4e[1] = kern_pml4e[1];
+  e->env_pml4e[2] = e->env_cr3 | PTE_P | PTE_U;
 
   return 0;
 }
@@ -307,6 +314,15 @@ region_alloc(struct Env *e, void *va, size_t len) {
   //   'va' and 'len' values that are not page-aligned.
   //   You should round va down, and round (va + len) up.
   //   (Watch out for corner-cases!)
+  void *end = ROUNDUP(va + len, PGSIZE);
+  va = ROUNDDOWN(va, PGSIZE);
+  struct PageInfo *pi;
+
+  while (va < end) {
+    pi = page_alloc(0);
+    page_insert(e->env_pml4e, pi, va, PTE_U | PTE_W);
+    va += PGSIZE;
+  }
 }
 
 #ifdef SANITIZE_USER_SHADOW_BASE
@@ -450,22 +466,34 @@ load_icode(struct Env *e, uint8_t *binary) {
     panic("load_icode: file has incorrect program headers size");
   }
   struct Proghdr * program_header = (struct Proghdr *)(binary + elf_header->e_phoff);
+  lcr3(PADDR(e->env_pml4e));
   for (size_t i = 0; i < elf_header->e_phnum; i++) {
     if (program_header[i].p_type == ELF_PROG_LOAD) {
       void * src = binary + program_header[i].p_offset;
       void * dst = (void *)program_header[i].p_va;
 
+      region_alloc(e, (void*) dst, program_header[i].p_memsz);
+
       memcpy(dst, src, program_header[i].p_filesz);
-      memset(dst + program_header[i].p_filesz, 0, program_header[i].p_memsz);
+      memset(dst + program_header[i].p_filesz, 0, program_header[i].p_memsz - program_header[i].p_filesz);
 
     }
   }
+  lcr3(PADDR(kern_pml4e));
   e->env_tf.tf_rip = elf_header->e_entry;
 #ifdef CONFIG_KSPACE
   bind_functions(e, binary);
 #endif
   // LAB 8: Your code here.
+   region_alloc(e, (void *) (USTACKTOP - USTACKSIZE), USTACKSIZE);
 
+#ifdef SANITIZE_USER_SHADOW_BASE
+  region_alloc(e, (void*) SANITIZE_USER_SHADOW_BASE, SANITIZE_USER_SHADOW_SIZE);
+  region_alloc(e, (void*) SANITIZE_USER_EXTRA_SHADOW_BASE, SANITIZE_USER_EXTRA_SHADOW_SIZE);
+  region_alloc(e, (void*) SANITIZE_USER_FS_SHADOW_BASE, SANITIZE_USER_FS_SHADOW_SIZE);
+  region_alloc(e, (void*) SANITIZE_USER_STACK_SHADOW_BASE, SANITIZE_USER_STACK_SHADOW_SIZE);
+  region_alloc(e, (void*) SANITIZE_USER_VPT_SHADOW_BASE, SANITIZE_USER_VPT_SHADOW_SIZE);
+#endif
 }
 
 //
@@ -485,6 +513,7 @@ env_create(uint8_t *binary, enum EnvType type) {
   }
   load_icode(env_ptr, binary);
   env_ptr->env_type = type;
+  env_ptr->binary = binary;
 }
 
 //
@@ -708,7 +737,10 @@ env_run(struct Env *e) {
   curenv->env_status = ENV_RUNNING;
   curenv->env_runs++;
 
-  env_pop_tf(&curenv->env_tf);
   // LAB 8: Your code here.
+  lcr3(curenv->env_cr3);
+
+  env_pop_tf(&curenv->env_tf);
+
   while(1) {}
 }
