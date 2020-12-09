@@ -30,7 +30,10 @@ set_pgfault_handler(void (*handler)(struct UTrapframe *utf)) {
   if (_pgfault_handler == 0) {
     // First time through!
     // LAB 9: Your code here.
-
+    error = sys_page_alloc(envid, (void *)(UXSTACKTOP - PGSIZE), PTE_U | PTE_P | PTE_W);
+    if (error < 0) {
+      panic("set_pgfault_handler: %i", error);
+    }
   }
 
   // Save handler pointer for assembly to call.
