@@ -618,8 +618,8 @@ env_destroy(struct Env *e) {
   // it traps to the kernel.
 
   e->env_status = ENV_DYING; // environment died, long live new environment (not here)!
+  env_free(e); // очистка среды
   if (e == curenv) {
-    env_free(e); // очистка среды
     sched_yield(); // вызывается функция, обрабатывающая смену/удаление среды
   }
 }
