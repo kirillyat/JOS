@@ -93,7 +93,7 @@ sys_exofork(void) {
 
   e->env_status = ENV_NOT_RUNNABLE;
   e->env_tf = curenv->env_tf;
-  e->env_pgfault_upcall = curenv->env_pgfault_upcall;
+  //e->env_pgfault_upcall = curenv->env_pgfault_upcall;
 
   e->env_tf.tf_regs.reg_rax = 0;
 
@@ -375,7 +375,6 @@ sys_ipc_recv(void *dstva) {
   curenv->env_tf.tf_regs.reg_rax = 0;
 	sched_yield();
 	return 0;
-  return -1;
 }
 
 // Dispatches to the correct kernel function, passing the arguments.
