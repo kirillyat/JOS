@@ -62,7 +62,7 @@ OBJCOPY	:= llvm/gnu-objcopy
 OBJDUMP	:= llvm-objdump
 NM	:= llvm-nm
 
-EXTRA_CFLAGS	:= $(EXTRA_CFLAGS) -Wno-self-assign -Wno-format-nonliteral -Wno-address-of-packed-member -Wno-frame-address
+EXTRA_CFLAGS	:= $(EXTRA_CFLAGS) -Wno-self-assign -Wno-format-nonliteral -Wno-address-of-packed-member
 
 GCC_LIB := $(shell $(CC) $(CFLAGS) -print-resource-dir)/lib/jetos/libclang_rt.builtins-x86_64.a
 
