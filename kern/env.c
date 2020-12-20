@@ -525,6 +525,9 @@ env_create(uint8_t *binary, enum EnvType type) {
     panic("env_alloc: %i", result);
   }
   load_icode(env_ptr, binary);
+  if (type == ENV_TYPE_FS) {
+    env_ptr->env_tf.tf_rflags |= FL_IOPL_3;
+  }
   env_ptr->env_type = type;
   env_ptr->binary = binary;
 }
