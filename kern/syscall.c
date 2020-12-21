@@ -127,6 +127,26 @@ sys_env_set_status(envid_t envid, int status) {
   return 0;
 }
 
+static int
+sys_env_set_trapframe(envid_t envid, struct Trapframe *tf) {
+  struct Env *env;
+  int res = envid2env(envid, &env, 1);
+
+  if (res < 0)
+    return res;
+
+  user_mem_assert(curenv, tf, sizeof(*tf), 0);
+
+  env->env_tf       = *tf;
+  env->env_tf.tf_cs = GD_UT | 3;
+  env->env_tf.tf_ds = GD_UD | 3;
+  env->env_tf.tf_es = GD_UD | 3;
+  env->env_tf.tf_ss = GD_UD | 3;
+  env->env_tf.tf_rflags &= 0xFFF;
+  env->env_tf.tf_rflags |= FL_IF;
+  return 0;
+}
+
 // Set the page fault upcall for 'envid' by modifying the corresponding struct
 // Env's 'env_pgfault_upcall' field.  When 'envid' causes a page fault, the
 // kernel will push a fault record onto the exception stack, then branch to
@@ -369,12 +389,12 @@ sys_ipc_recv(void *dstva) {
   if ((uintptr_t)dstva < UTOP && PGOFF(dstva)) {
     return -E_INVAL;
   }
-	curenv->env_ipc_recving = 1;
-	curenv->env_ipc_dstva = dstva;
-	curenv->env_status = ENV_NOT_RUNNABLE;
+  curenv->env_ipc_recving = 1;
+  curenv->env_ipc_dstva = dstva;
+  curenv->env_status = ENV_NOT_RUNNABLE;
   curenv->env_tf.tf_regs.reg_rax = 0;
-	sched_yield();
-	return 0;
+  sched_yield();
+  return 0;
 }
 
 // Dispatches to the correct kernel function, passing the arguments.
@@ -405,6 +425,8 @@ syscall(uintptr_t syscallno, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t
       return sys_env_set_status(a1, a2);
     case SYS_env_set_pgfault_upcall:
       return sys_env_set_pgfault_upcall(a1, (void *)a2);
+    case SYS_env_set_trapframe:
+      return sys_env_set_trapframe(a1, (void *)a2);
     case SYS_yield:
       sys_yield();
       return 0;
