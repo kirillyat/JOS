@@ -77,7 +77,12 @@ duppage(envid_t envid, uintptr_t pn) {
   int r;
   envid_t id = sys_getenvid();
 
-  if (ent & (PTE_W | PTE_COW)) {
+  if (ent & PTE_SHARE) {
+    if ((r = sys_page_map(0, (void *)(pn * PGSIZE), envid, (void *)(pn * PGSIZE), ent)) < 0) {
+      panic("duppage error: sys_page_map PTE_SHARE: %i\n", r);
+    }
+
+  } else if (ent & (PTE_W | PTE_COW)) {
     ent = (ent | PTE_COW) & ~PTE_W;
     r = sys_page_map(id, (void *)(pn * PGSIZE), envid, (void *)(pn * PGSIZE), ent);
 
