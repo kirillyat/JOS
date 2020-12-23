@@ -236,6 +236,8 @@ trap_dispatch(struct Trapframe *tf) {
   if (tf->tf_trapno == IRQ_OFFSET + IRQ_CLOCK) {
     // Update vsys memory with current time.
     // LAB 12: Your code here.
+    vsys[VSYS_gettime] = gettime();
+    pic_send_eoi(IRQ_CLOCK);
     timer_for_schedule->handle_interrupts();
     sched_yield();
     return;

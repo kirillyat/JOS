@@ -142,6 +142,8 @@
 // Read-only copies of the global env structures
 #define UENVS (UPAGES - PTSIZE)
 
+#define UVSYS (UENVS - PTSIZE)
+
 /*
  * Top of user VM. User can manipulate VA from UTOP-1 and down!
  */
