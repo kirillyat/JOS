@@ -1,6 +1,7 @@
 /* See COPYRIGHT for copyright information. */
 
 #include <inc/x86.h>
+#include <inc/time.h>
 #include <kern/kclock.h>
 #include <kern/timer.h>
 #include <kern/trap.h>
@@ -29,6 +30,28 @@ struct Timer timer_rtc = {
     .enable_interrupts = rtc_timer_pic_interrupt,
     .handle_interrupts = rtc_timer_pic_handle,
 };
+
+static int
+get_time(void) {
+  struct tm time;
+
+  time.tm_sec  = BCD2BIN(mc146818_read(RTC_SEC));
+  time.tm_min  = BCD2BIN(mc146818_read(RTC_MIN));
+  time.tm_hour = BCD2BIN(mc146818_read(RTC_HOUR));
+  time.tm_mday = BCD2BIN(mc146818_read(RTC_DAY));
+  time.tm_mon  = BCD2BIN(mc146818_read(RTC_MON));
+  time.tm_year = BCD2BIN(mc146818_read(RTC_YEAR));
+
+  return timestamp(&time);
+}
+
+int
+gettime(void) {
+  nmi_disable();
+  // LAB 12: your code here
+  nmi_enable();
+  return 0;
+}
 
 void
 rtc_init(void) {
