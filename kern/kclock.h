@@ -59,6 +59,8 @@ unsigned mc146818_read(unsigned reg);
 void mc146818_write(unsigned reg, unsigned datum);
 unsigned mc146818_read16(unsigned reg);
 
+int gettime(void);
+
 #define BCD2BIN(bcd) ((((bcd)&15) + ((bcd) >> 4) * 10))
 
 #endif // !JOS_KERN_KCLOCK_H
