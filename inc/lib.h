@@ -102,12 +102,17 @@ ssize_t readn(int fd, void *buf, size_t nbytes);
 int dup(int oldfd, int newfd);
 int fstat(int fd, struct Stat *statbuf);
 int stat(const char *path, struct Stat *statbuf);
+uint64_t fd2num(struct Fd *fd);
+char* fd2data(struct Fd *fd);
 
 // file.c
 int open(const char *path, int mode);
 int ftruncate(int fd, off_t size);
 int remove(const char *path);
 int sync(void);
+
+// fifo.c
+int mkfifo(const char *path);
 
 // pageref.c
 int pageref(void *addr);

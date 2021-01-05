@@ -1,0 +1,24 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+
+import datetime
+from gradelib import *
+
+r = Runner(save("jos.out"),
+           stop_breakpoint("cons_getc"))
+
+@test(100)
+def test_testfifo():
+    r.user_test("testfifo", timeout=100)
+
+    r.show_qemu_output()
+    r.match("fifo creation is successful")
+    r.match("fifo repeated creation is successful")
+    r.match("writing into fifo is successful")
+    r.match("reading from fifo is successful")
+    r.match("1th fifo closing is successful")
+    r.match("2nd fifo closing is successful")
+    r.match("End of writing with code 39")
+    r.match("End of reading with code 0")
+
+run_tests()

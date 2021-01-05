@@ -28,6 +28,8 @@ enum {
   E_FILE_EXISTS = 16, // File already exists
   E_NOT_EXEC    = 17, // File not a valid executable
   E_NOT_SUPP    = 18, // Operation not supported
+  E_FIFO	      = 19,	// Fifo wait
+	E_FIFO_CLOSE  = 20,	// No readers of Fifo
 
   MAXERROR
 };

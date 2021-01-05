@@ -16,7 +16,7 @@ fsipc(unsigned type, void *dstva) {
   if (fsenv == 0)
     fsenv = ipc_find_env(ENV_TYPE_FS);
 
-  static_assert(sizeof(fsipcbuf) == PGSIZE, "Invalid fsipcbuf size");
+  // static_assert(sizeof(fsipcbuf) == PGSIZE, "Invalid fsipcbuf size");
 
   if (debug)
     cprintf("[%08x] fsipc %d %08x\n", thisenv->env_id, type, *(uint32_t *)&fsipcbuf);
@@ -177,6 +177,7 @@ devfile_stat(struct Fd *fd, struct Stat *st) {
   strcpy(st->st_name, fsipcbuf.statRet.ret_name);
   st->st_size  = fsipcbuf.statRet.ret_size;
   st->st_isdir = fsipcbuf.statRet.ret_isdir;
+  st->st_isfifo = fsipcbuf.statRet.ret_isfifo;
   return 0;
 }
 

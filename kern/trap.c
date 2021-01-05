@@ -229,6 +229,8 @@ trap_dispatch(struct Trapframe *tf) {
   if (tf->tf_trapno == IRQ_OFFSET + IRQ_SPURIOUS) {
     cprintf("Spurious interrupt on irq 7\n");
     print_trapframe(tf);
+    pic_send_eoi(IRQ_SPURIOUS);
+		sched_yield();
     return;
   }
 
@@ -237,8 +239,9 @@ trap_dispatch(struct Trapframe *tf) {
     // Update vsys memory with current time.
     // LAB 12: Your code here.
     vsys[VSYS_gettime] = gettime();
-    pic_send_eoi(IRQ_CLOCK);
+    // pic_send_eoi(IRQ_CLOCK);
     timer_for_schedule->handle_interrupts();
+    pic_send_eoi(IRQ_CLOCK);
     sched_yield();
     return;
   }
@@ -247,11 +250,15 @@ trap_dispatch(struct Trapframe *tf) {
   // LAB 11: Your code here.
   if (tf->tf_trapno == IRQ_OFFSET + IRQ_KBD) {
     kbd_intr();
+    pic_send_eoi(IRQ_KBD);
+		sched_yield();
     return;
   }
 
   if (tf->tf_trapno == IRQ_OFFSET + IRQ_SERIAL) {
     serial_intr();
+    pic_send_eoi(IRQ_SERIAL);
+		sched_yield();
     return;
   }
 

@@ -97,6 +97,7 @@ serve_open(envid_t envid, struct Fsreq_open *req,
   int fileid;
   int r;
   struct OpenFile *o;
+  char *blk;
 
   if (debug)
     cprintf("serve_open %08x %s 0x%x\n", envid, req->req_path, req->req_omode);
@@ -154,6 +155,22 @@ serve_open(envid_t envid, struct Fsreq_open *req,
   o->o_fd->fd_dev_id  = devfile.dev_id;
   o->o_mode           = req->req_omode;
 
+
+  if (f->f_type == FTYPE_FIFO){
+
+    if ((r = file_get_block(f, 0, &blk)) < 0)
+      return r;  // file_get_block error
+
+    struct Fifo *fifo = (struct Fifo*) blk;
+
+    if (req->req_omode == O_RDONLY)
+      fifo->n_readers++;
+    if (req->req_omode == O_WRONLY)
+      fifo->n_writers++;
+
+    o->o_fd->fd_dev_id = devfifo.dev_id;
+	}
+  
   if (debug)
     cprintf("sending success, page %08lx\n", (unsigned long)o->o_fd);
 
@@ -163,6 +180,41 @@ serve_open(envid_t envid, struct Fsreq_open *req,
   *perm_store = PTE_P | PTE_U | PTE_W | PTE_SHARE;
 
   return 0;
+}
+
+// логика  этой функции похожа на serve_open() и file_open()
+int
+serve_create_fifo(envid_t envid, struct Fsreq_create_fifo *req)
+{
+	char path[MAXPATHLEN];
+	struct File *f;
+	int r;
+	char *blk;
+
+  // Copy in the path, making sure it's null-terminated
+	memmove(path, req->req_path, MAXPATHLEN);
+	path[MAXPATHLEN-1] = 0;
+
+  // Find an open file ID
+	if ((r = fifo_create(path, &f)) < 0) {
+    if (debug)
+      cprintf("fifo_create failed: %i", r);
+		return r;
+	}
+	if ((r = file_set_size(f, sizeof(struct Fifo))) < 0)
+		return r;
+
+	if ((r = file_get_block(f, 0, &blk)) < 0)
+		return r;
+
+	struct Fifo *fifo = (struct Fifo*) blk;
+
+	fifo->n_writers = 0;
+	fifo->n_readers = 0;
+	fifo->fifo_r_offset = 0;
+	fifo->fifo_w_offset = 0;
+
+	return 0;
 }
 
 // Set the size of req->req_fileid to req->req_size bytes, truncating
@@ -219,6 +271,55 @@ serve_read(envid_t envid, union Fsipc *ipc) {
   return count;
 }
 
+// логика  этой функции похожа на serve_read() и file_read()
+int
+serve_read_fifo(envid_t envid, union Fsipc *ipc)
+{
+	struct Fsreq_read_fifo *req = &ipc->read_fifo;
+	struct Fsret_read *ret = &ipc->readRet;
+	struct OpenFile *o;
+	int r, i;
+	char *blk, *buf;
+
+  // сколько байт требуется прочитать
+	int n = req->req_n;
+
+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
+		return r;
+  // в отличие от file_read(), читаем с filebno=0
+	if ((r = file_get_block(o->o_file, 0, &blk)) < 0)
+		return r;
+
+	struct Fifo *fifo = (struct Fifo*) blk;
+
+	buf = ret->ret_buf;
+	ret->ret_n = 0;
+
+	for (i = 0; i < n; i++) {
+
+		if (debug)
+			cprintf("read: %d\trpos: %d\n", i, fifo->fifo_r_offset);
+
+		while (fifo->fifo_r_offset == fifo->fifo_w_offset) {
+			// buf is empty
+
+			// no writers
+			if (fifo->n_writers == 0)
+				return 0;
+
+			// Wait until writers wtite something
+			ret->ret_n = i;
+			return -E_FIFO;
+		}
+
+		buf[i] = fifo->fifo_buf[fifo->fifo_r_offset % FIFOBUFSIZ];
+		fifo->fifo_r_offset++;
+	}
+
+	ret->ret_n = i;
+	return i;  // возвращаем кол-во прочитанных бит
+}
+
 // Write req->req_n bytes from req->req_buf to req_fileid, starting at
 // the current seek position, and update the seek position
 // accordingly.  Extend the file if necessary.  Returns the number of
@@ -242,6 +343,52 @@ serve_write(envid_t envid, struct Fsreq_write *req) {
   return count;
 }
 
+// логика  этой функции похожа на serve_write() и file_write()
+int
+serve_write_fifo(envid_t envid, union Fsipc *ipc)
+{
+	struct Fsreq_write_fifo *req = &ipc->write_fifo;
+	struct Fsret_write *ret = &ipc->writeRet;
+	struct OpenFile *o;
+	char *blk, *buf;
+	int i, r;
+	int n = req->req_n;
+
+	buf = req->req_buf;
+
+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
+		return r;
+	if ((r = file_get_block(o->o_file, 0, &blk)) < 0)
+		return r;
+
+	struct Fifo *fifo = (struct Fifo*) blk;
+
+	ret->ret_n = 0;
+
+	for (i = 0; i < n; i++) {
+
+		if (debug)
+			cprintf("write: %d\twpos: %d\n", i, fifo->fifo_w_offset);
+
+		while (fifo->fifo_w_offset >= fifo->fifo_r_offset + sizeof(fifo->fifo_buf)) {
+      // buf is not empty
+
+			// no readers
+			if (fifo->n_readers == 0)
+				return -E_FIFO_CLOSE;
+
+			// Wait until readers read something
+			ret->ret_n = i;
+			return -E_FIFO;
+		}
+		fifo->fifo_buf[fifo->fifo_w_offset % FIFOBUFSIZ] = buf[i];
+		fifo->fifo_w_offset++;
+	}
+
+	ret->ret_n = i;
+	return i;
+}
+
 // Stat ipc->stat.req_fileid.  Return the file's struct Stat to the
 // caller in ipc->statRet.
 int
@@ -260,7 +407,33 @@ serve_stat(envid_t envid, union Fsipc *ipc) {
   strcpy(ret->ret_name, o->o_file->f_name);
   ret->ret_size  = o->o_file->f_size;
   ret->ret_isdir = (o->o_file->f_type == FTYPE_DIR);
+  ret->ret_isfifo = (o->o_file->f_type == FTYPE_FIFO);
   return 0;
+}
+
+// логика этой функции похожа на serve_stat(), 
+// но значениеи ret_size получается сложнее
+int
+serve_stat_fifo(envid_t envid, union Fsipc *ipc)
+{
+	struct Fsreq_stat_fifo *req = &ipc->stat_fifo;
+	struct Fsret_stat *ret = &ipc->statRet;
+	struct OpenFile *o;
+	int r;
+	char *blk;
+
+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
+		return r;
+	if ((r = file_get_block(o->o_file, 0, &blk)) < 0)
+		return r;
+
+	struct Fifo *fifo = (struct Fifo*) blk;
+
+	strcpy(ret->ret_name, o->o_file->f_name);
+	ret->ret_size = fifo->fifo_w_offset - fifo->fifo_r_offset;
+	ret->ret_isdir = 0;
+	ret->ret_isfifo = 1;
+	return 0;
 }
 
 // Flush all data and metadata of req->req_fileid to disk.
@@ -284,6 +457,33 @@ serve_sync(envid_t envid, union Fsipc *req) {
   return 0;
 }
 
+// логика этой функции похожа на serve_flush(), 
+// но тут изменяется счетчик читателей и писателей
+int
+serve_close_fifo(envid_t envid, union Fsipc *ipc)
+{
+	struct Fsreq_close_fifo *req = &ipc->close_fifo;
+	struct OpenFile *o;
+	int r;
+	char *blk;
+
+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
+		return r;
+	if ((r = file_get_block(o->o_file, 0, &blk)) < 0)
+		return r;
+
+	struct Fifo *fifo = (struct Fifo*) blk;
+
+	if (o->o_mode == O_RDONLY)
+		fifo->n_readers--;
+	if (o->o_mode == O_WRONLY)
+		fifo->n_writers--;
+
+	file_flush(o->o_file);
+
+	return 0;
+}
+
 typedef int (*fshandler)(envid_t envid, union Fsipc *req);
 
 fshandler handlers[] = {
@@ -294,7 +494,11 @@ fshandler handlers[] = {
     [FSREQ_FLUSH]    = (fshandler)serve_flush,
     [FSREQ_WRITE]    = (fshandler)serve_write,
     [FSREQ_SET_SIZE] = (fshandler)serve_set_size,
-    [FSREQ_SYNC]     = serve_sync};
+    [FSREQ_SYNC]     = serve_sync,
+    [FSREQ_READ_FIFO]  = serve_read_fifo,
+	  [FSREQ_STAT_FIFO]  = serve_stat_fifo,
+	  [FSREQ_WRITE_FIFO] = (fshandler)serve_write_fifo,
+	  [FSREQ_CLOSE_FIFO] = (fshandler)serve_close_fifo};
 #define NHANDLERS (sizeof(handlers) / sizeof(handlers[0]))
 
 void
@@ -321,6 +525,8 @@ serve(void) {
     pg = NULL;
     if (req == FSREQ_OPEN) {
       r = serve_open(whom, (struct Fsreq_open *)fsreq, &pg, &perm);
+    } else if (req == FSREQ_CREATE_FIFO) {
+			r = serve_create_fifo(whom, (struct Fsreq_create_fifo*)fsreq);
     } else if (req < NHANDLERS && handlers[req]) {
       r = handlers[req](whom, fsreq);
     } else {

@@ -41,6 +41,7 @@ struct Stat {
   char st_name[MAXNAMELEN];
   off_t st_size;
   int st_isdir;
+  int st_isfifo;
   struct Dev *st_dev;
 };
 
@@ -54,5 +55,6 @@ int dev_lookup(int devid, struct Dev **dev_store);
 extern struct Dev devfile;
 extern struct Dev devcons;
 extern struct Dev devpipe;
+extern struct Dev devfifo;
 
 #endif // not JOS_INC_FD_H

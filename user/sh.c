@@ -107,6 +107,21 @@ again:
         panic("| not implemented");
         break;
 
+      case '&':
+  	    if ((r = fork()) == 0) {
+          // Child
+          cprintf("Child\n");
+          // Run the current command!
+          goto runit;
+          return;  // эта строка никогда не выполняется, существует для успокоения души
+	      } else {
+          //Parent
+          cprintf("Parent, fork: %d\n", r);
+          exit();
+          break;
+        }
+
+
       case 0: // String is complete
         // Run the current command!
         goto runit;

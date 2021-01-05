@@ -26,6 +26,16 @@
 
 #define MAXFILESIZE ((NDIRECT + NINDIRECT) * BLKSIZE)
 
+#define FIFOBUFSIZ 256
+
+struct Fifo {
+	int n_readers;	    // number of readers
+	int n_writers;	    // number of writers
+	off_t fifo_r_offset;	// read offset
+	off_t fifo_w_offset;	// write offset
+	uint8_t fifo_buf[FIFOBUFSIZ];	// data buffer
+};
+
 struct File {
   char f_name[MAXNAMELEN]; // filename
   off_t f_size;            // file size in bytes
@@ -47,6 +57,7 @@ struct File {
 // File types
 #define FTYPE_REG 0 // Regular file
 #define FTYPE_DIR 1 // Directory
+#define FTYPE_FIFO	2	// FIFO
 
 // File system super-block (both in-memory and on-disk)
 
@@ -69,7 +80,12 @@ enum {
   FSREQ_STAT,
   FSREQ_FLUSH,
   FSREQ_REMOVE,
-  FSREQ_SYNC
+  FSREQ_SYNC,
+  FSREQ_CREATE_FIFO,
+	FSREQ_READ_FIFO,
+	FSREQ_WRITE_FIFO,
+	FSREQ_STAT_FIFO,
+	FSREQ_CLOSE_FIFO
 };
 
 union Fsipc {
@@ -77,6 +93,9 @@ union Fsipc {
     char req_path[MAXPATHLEN];
     int req_omode;
   } open;
+  struct Fsreq_create_fifo {
+		char req_path[MAXPATHLEN];
+	} create_fifo;
   struct Fsreq_set_size {
     int req_fileid;
     off_t req_size;
@@ -86,7 +105,8 @@ union Fsipc {
     size_t req_n;
   } read;
   struct Fsret_read {
-    char ret_buf[PGSIZE];
+    int ret_n;
+		char ret_buf[PGSIZE - sizeof(int)];
   } readRet;
   struct Fsreq_write {
     int req_fileid;
@@ -100,6 +120,7 @@ union Fsipc {
     char ret_name[MAXNAMELEN];
     off_t ret_size;
     int ret_isdir;
+    int ret_isfifo;
   } statRet;
   struct Fsreq_flush {
     int req_fileid;
@@ -107,6 +128,24 @@ union Fsipc {
   struct Fsreq_remove {
     char req_path[MAXPATHLEN];
   } remove;
+  	struct Fsreq_read_fifo {
+		int req_fileid;
+		size_t req_n;
+	} read_fifo;
+	struct Fsreq_write_fifo {
+		int req_fileid;
+		size_t req_n;
+		char req_buf[PGSIZE - (sizeof(int) + sizeof(size_t))];
+	} write_fifo;
+	struct Fsreq_stat_fifo {
+		int req_fileid;
+	} stat_fifo;
+	struct Fsreq_close_fifo {
+		int req_fileid;
+	} close_fifo;
+	struct Fsret_write {
+		int ret_n;
+	} writeRet;
 
   // Ensure Fsipc is one page
   char _pad[PGSIZE];

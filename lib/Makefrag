@@ -23,6 +23,7 @@ LIB_SRCFILES :=		$(LIB_SRCFILES) \
 			lib/args.c \
 			lib/fd.c \
 			lib/file.c \
+			lib/fifo.c \
 			lib/fprintf.c \
 			lib/pageref.c \
 			lib/spawn.c \
