@@ -3,6 +3,11 @@
  * serves IPC requests from other environments.
  */
 
+#ifdef debug
+#undef debug
+#endif
+#define debug 0
+
 #include <inc/x86.h>
 #include <inc/string.h>
 
@@ -298,26 +303,25 @@ serve_read_fifo(envid_t envid, union Fsipc *ipc)
 	for (i = 0; i < n; i++) {
 
 		if (debug)
-			cprintf("read: %d\trpos: %d\n", i, fifo->fifo_r_offset);
+    	cprintf("read: %d of %d\tt_off: %d\n", i, n, fifo->fifo_r_offset);
 
-		while (fifo->fifo_r_offset == fifo->fifo_w_offset) {
+		if (fifo->fifo_r_offset == fifo->fifo_w_offset) {
 			// buf is empty
 
 			// no writers
 			if (fifo->n_writers == 0)
-				return 0;
+				return -E_FIFO_CLOSE;
 
 			// Wait until writers wtite something
-			ret->ret_n = i;
 			return -E_FIFO;
 		}
 
 		buf[i] = fifo->fifo_buf[fifo->fifo_r_offset % FIFOBUFSIZ];
 		fifo->fifo_r_offset++;
+    ret->ret_n++;
 	}
 
-	ret->ret_n = i;
-	return i;  // возвращаем кол-во прочитанных бит
+	return i+1;  // возвращаем кол-во прочитанных бит
 }
 
 // Write req->req_n bytes from req->req_buf to req_fileid, starting at
@@ -368,25 +372,25 @@ serve_write_fifo(envid_t envid, union Fsipc *ipc)
 	for (i = 0; i < n; i++) {
 
 		if (debug)
-			cprintf("write: %d\twpos: %d\n", i, fifo->fifo_w_offset);
+		  cprintf("write: %d of %d\tw_off: %d\n", i, n, fifo->fifo_w_offset);
 
-		while (fifo->fifo_w_offset >= fifo->fifo_r_offset + sizeof(fifo->fifo_buf)) {
-      // buf is not empty
+      if (fifo->fifo_w_offset >= fifo->fifo_r_offset + FIFOBUFSIZ) {
+      // buf is full
 
 			// no readers
 			if (fifo->n_readers == 0)
 				return -E_FIFO_CLOSE;
 
 			// Wait until readers read something
-			ret->ret_n = i;
 			return -E_FIFO;
 		}
+    cprintf("wrote %c\n", buf[i]);
 		fifo->fifo_buf[fifo->fifo_w_offset % FIFOBUFSIZ] = buf[i];
 		fifo->fifo_w_offset++;
+    ret->ret_n++;
 	}
 
-	ret->ret_n = i;
-	return i;
+	return i+1;
 }
 
 // Stat ipc->stat.req_fileid.  Return the file's struct Stat to the

@@ -27,11 +27,11 @@ umain(int argc, char **argv)
     else cprintf("FAILURE\n");
 
 	cprintf("1th fifo opening ");
-	if ((fd1 = open(path_fifo, O_RDONLY)) > 0)
+	if ((fd1 = open(path_fifo, O_RDONLY)) >= 0)
 		printf("is successful\n");
     else cprintf("FAILURE\n");
     cprintf("2nd fifo opening ");
-	if ((fd2 = open(path_fifo, O_WRONLY)) > 0)
+	if ((fd2 = open(path_fifo, O_WRONLY)) >= 0)
 		printf("is successful\n");
     else cprintf("FAILURE\n");
 
