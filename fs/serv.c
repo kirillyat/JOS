@@ -321,7 +321,7 @@ serve_read_fifo(envid_t envid, union Fsipc *ipc)
     ret->ret_n++;
 	}
 
-	return i+1;  // возвращаем кол-во прочитанных бит
+	return ret->ret_n;  // возвращаем кол-во прочитанных бит
 }
 
 // Write req->req_n bytes from req->req_buf to req_fileid, starting at
@@ -384,13 +384,12 @@ serve_write_fifo(envid_t envid, union Fsipc *ipc)
 			// Wait until readers read something
 			return -E_FIFO;
 		}
-    cprintf("wrote %c\n", buf[i]);
 		fifo->fifo_buf[fifo->fifo_w_offset % FIFOBUFSIZ] = buf[i];
 		fifo->fifo_w_offset++;
     ret->ret_n++;
 	}
 
-	return i+1;
+	return ret->ret_n;
 }
 
 // Stat ipc->stat.req_fileid.  Return the file's struct Stat to the
