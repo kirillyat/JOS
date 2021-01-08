@@ -127,6 +127,10 @@ devfifo_write(struct Fd *fd, const void *buf, size_t n)
 					cprintf("write \n");
 				sys_yield();
 				continue;
+			} else if (r == -E_FIFO_CLOSE) {
+        // нет читателей, возвращаем все, что попало в канал
+				cprintf("fifo buffer is full, %d bytes are written\n", res + fsipcbuf_fifo.writeRet.ret_n);
+				return res + fsipcbuf_fifo.writeRet.ret_n;
 			}
 
 			return r;

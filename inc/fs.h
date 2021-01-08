@@ -106,7 +106,7 @@ union Fsipc {
   } read;
   struct Fsret_read {
     int ret_n;
-		char ret_buf[PGSIZE];
+		char ret_buf[PGSIZE - sizeof(size_t)];
   } readRet;
   struct Fsreq_write {
     int req_fileid;
@@ -135,7 +135,7 @@ union Fsipc {
 	struct Fsreq_write_fifo {
 		int req_fileid;
 		size_t req_n;
-		char req_buf[PGSIZE];
+		char req_buf[PGSIZE - (2 * sizeof(size_t))];
 	} write_fifo;
 	struct Fsreq_stat_fifo {
 		int req_fileid;
