@@ -113,3 +113,21 @@ int
 sys_gettime(void) {
   return syscall(SYS_gettime, 0, 0, 0, 0, 0, 0);
 }
+
+int
+sys_sigqueue(envid_t envid, int signo, int value)
+{
+    return syscall(SYS_sigqueue, 0, envid, signo, value, 0, 0);
+}
+
+int
+sys_sigwait(int *signo)
+{
+    return syscall(SYS_sigwait, 0, (uint64_t) signo, 0, 0, 0, 0);
+}
+
+int
+sys_sigaction(int signo, struct sigaction *act)
+{
+    return syscall(SYS_sigaction, 0, signo, (uint64_t) act, 0, 0, 0);
+}

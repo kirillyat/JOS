@@ -16,6 +16,7 @@
 #include <kern/env.h>
 #include <kern/pmap.h>
 #include <kern/trap.h>
+#include <kern/syscall.h>
 
 #define CMDBUF_SIZE 80 // enough for one VGA text line
 
@@ -39,6 +40,8 @@ static struct Command commands[] = {
     {"timer_start", "Start one of the timers hpet0, hpet1, pit, pm. Only one timer can be run at a time", mon_start},
     {"timer_stop", "Stop one of the timers", mon_stop},
     {"timer_freq", "Measure the cpu frequency using one of hpet0, hpet1, pit, pm", mon_frequency},
+    {"kill", "Send a signal to a process", mon_kill },
+    {"exit", "Exit monitor", mon_exit },
     {"memory", "Print list of all physical pages", mon_memory}
     };
 #define NCOMMANDS (sizeof(commands) / sizeof(commands[0]))
@@ -185,6 +188,41 @@ mon_memory(int argc, char **argv, struct Trapframe *tf) {
   }
 
   return 0;
+}
+
+int
+mon_kill(int argc, char **argv, struct Trapframe *tf)
+{
+    int signo;
+    int value;
+    envid_t envid;
+    switch (argc)
+    {
+    case 3:
+        signo = -strtol(argv[1], 0, 10);
+        if (signo < 0) break;
+        envid = strtol(argv[2], 0, 16);
+        if (syscall(SYS_sigqueue, envid, signo, 0, 0, 0)) break;
+        return 0;
+    case 4:
+        signo = -strtol(argv[1], 0, 10);
+        if (signo < 0) break;
+        value = strtol(argv[2], 0, 10);
+        envid = strtol(argv[3], 0, 16);
+        if (syscall(SYS_sigqueue, envid, signo, value, 0, 0)) break;
+        return 0;
+    default:
+        break;
+    };
+    cprintf("Usage: %s -[SIGNO] ([VALUE] [ENVID]) | [ENVID]\n", argv[0]);
+    cprintf("Send a signal to a process.\n");
+    return 0;
+}
+
+int
+mon_exit(int argc, char **argv, struct Trapframe *tf)
+{
+    return -1;
 }
 
 /***** Kernel monitor command interpreter *****/

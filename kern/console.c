@@ -5,11 +5,15 @@
 #include <inc/kbdreg.h>
 #include <inc/string.h>
 #include <inc/assert.h>
+#include <inc/signal.h>
 
 #include <kern/console.h>
 #include <kern/picirq.h>
 #include <inc/uefi.h>
 #include <kern/pmap.h>
+#include <kern/syscall.h>
+#include <kern/monitor.h>
+#include <kern/env.h>
 
 static bool graphics_exists = false;
 static uint32_t uefi_vres;
@@ -477,6 +481,24 @@ kbd_proc_data(void) {
     cprintf("Rebooting!\n");
     outb(0x92, 0x3); // courtesy of Chris Frost
   }
+
+  if (!(~shift & CTL))
+    {
+        switch (normalmap[data])
+        {
+        case 't':
+            monitor(0);
+            return 0;
+        case 'c':
+            syscall(SYS_sigqueue, curenv->env_id, SIGINT, 0, 0, 0);
+            return 0;
+        case 'z':
+            syscall(SYS_sigqueue, curenv->env_id, SIGSTOP, 0, 0, 0);
+            return 0;
+        default:
+            return 0;
+        };
+    }
 
   return c;
 }

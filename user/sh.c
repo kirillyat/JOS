@@ -15,6 +15,21 @@ int gettoken(char *s, char **token);
 // runcmd() is called in a forked child,
 // so it's OK to manipulate file descriptor state.
 #define MAXARGS 16
+envid_t child = 0;
+
+void
+stop(int val)
+{
+    if (child) sys_sigqueue(child, SIGSTOP, 0);
+    sys_sigqueue(sys_getenvid(), SIGSTOP, 0);
+}
+
+void
+cont(int val)
+{
+    if (child) sys_sigqueue(child, SIGCONT, 0);
+}
+
 void
 runcmd(char *s) {
   char *argv[MAXARGS], *t, argv0buf[BUFSIZ];
@@ -163,16 +178,21 @@ runit:
   if ((r = spawn(argv[0], (const char **)argv)) < 0)
     cprintf("spawn %s: %i\n", argv[0], r);
 
+  child = r;
   // In the parent, close all file descriptors and wait for the
   // spawned command to exit.
   close_all();
-  if (r >= 0) {
-    if (debug)
-      cprintf("[%08x] WAIT %s %08x\n", thisenv->env_id, argv[0], r);
-    wait(r);
-    if (debug)
-      cprintf("[%08x] wait finished\n", thisenv->env_id);
-  }
+	if (r >= 0) {
+    struct sigaction sa = {stop};
+    sys_sigaction(SIGUSR1, &sa);
+    sa.sa_handler = cont;
+    sys_sigaction(SIGCONT, &sa);
+		if (debug)
+			cprintf("[%08x] WAIT %s %08x\n", thisenv->env_id, argv[0], r);
+		wait(r);
+		if (debug)
+			cprintf("[%08x] wait finished\n", thisenv->env_id);
+	}
 
   // If we were the left-hand part of a pipe,
   // wait for the right-hand part to finish.
@@ -273,6 +293,9 @@ umain(int argc, char **argv) {
   int r, interactive, echocmds;
   struct Argstate args;
 
+  envid_t stopped[64];
+  int stopped_cnt = 0;
+
   interactive = '?';
   echocmds    = 0;
   argstart(&argc, argv, &args);
@@ -314,6 +337,26 @@ umain(int argc, char **argv) {
       cprintf("LINE: %s\n", buf);
     if (buf[0] == '#')
       continue;
+    if (buf[0] == '!')
+        {
+            if (!stopped_cnt) continue;
+            r = stopped[--stopped_cnt];
+            sys_sigqueue(r, SIGCONT, 0);
+	        const volatile struct Env *e = &envs[ENVX(r)];
+		    sys_yield();
+		    sys_yield();
+		    sys_yield();
+		    sys_yield();
+	        while (e->env_id == r && e->env_status != ENV_FREE && !(e->env_sigflags & SIG_STOPPED))
+            {
+		        sys_yield();
+            }
+            if (e->env_sigflags & SIG_STOPPED)
+            {
+                stopped[stopped_cnt++] = e->env_id;
+            }
+            continue;
+        }
     if (echocmds)
       printf("# %s\n", buf);
     if (debug)
@@ -323,9 +366,18 @@ umain(int argc, char **argv) {
     if (debug)
       cprintf("FORK: %d\n", r);
     if (r == 0) {
-      runcmd(buf);
-      exit();
-    } else
-      wait(r);
-  }
+			runcmd(buf);
+			exit();
+		} else {
+	        const volatile struct Env *e = &envs[ENVX(r)];
+	        while (e->env_id == r && e->env_status != ENV_FREE && !(e->env_sigflags & SIG_STOPPED))
+            {
+		        sys_yield();
+            }
+            if (e->env_sigflags & SIG_STOPPED)
+            {
+                stopped[stopped_cnt++] = e->env_id;
+            }
+        }
+	}
 }

@@ -15,6 +15,7 @@
 #include <kern/cpu.h>
 #include <kern/kdebug.h>
 #include <kern/macro.h>
+#include <kern/syscall.h>
 
 #ifdef CONFIG_KSPACE
 struct Env env_array[NENV];
@@ -621,12 +622,19 @@ env_destroy(struct Env *e) {
   // If e is currently running on other CPUs, we change its state to
   // ENV_DYING. A zombie environment will be freed the next time
   // it traps to the kernel.
-
-  e->env_status = ENV_DYING; // environment died, long live new environment (not here)!
-  env_free(e); // очистка среды
-  if (e == curenv) {
-    sched_yield(); // вызывается функция, обрабатывающая смену/удаление среды
+  if (e->env_status == ENV_RUNNING && curenv != e) {
+		  e->env_status = ENV_DYING;
+		  return;
   }
+
+  syscall(SYS_sigqueue, e->env_parent_id, SIGCHLD, e->env_id, 0, 0);
+	
+  env_free(e);
+
+	if (curenv == e) {
+		curenv = NULL;
+		sched_yield();
+	}
 }
 
 #ifdef CONFIG_KSPACE
@@ -755,6 +763,48 @@ env_run(struct Env *e) {
 
   // LAB 8: Your code here.
   lcr3(curenv->env_cr3);
+
+  if (e->env_sigev_cnt && !(e->env_sigflags & SIG_HANDLING))
+    {
+        e->env_sigflags |= SIG_HANDLING;
+        struct sigevent *sigev;
+        struct sigaction *sa;
+        struct sigaction *nsa;
+        uintptr_t stack = e->env_tf.tf_rsp;
+        --e->env_sigev_cnt;
+        sigev = e->env_sigev + e->env_sigev_cnt;
+        sa = e->env_sa + sigev->sigev_signo;
+        stack -= 4;
+        *(uintptr_t *) stack = e->env_tf.tf_rip;
+        stack -= sizeof(e->env_tf);
+        *(struct Trapframe *) stack = e->env_tf;
+        stack -= 4;
+        *(uintptr_t *) stack = 0;
+        stack -= 4;
+        *(int *) stack = sigev->sigev_value;
+        stack -= 4;
+        *(void (**)()) stack = sa->sa_restorer;
+        while (e->env_sigev_cnt)
+        {
+            --e->env_sigev_cnt;
+            sigev = e->env_sigev + e->env_sigev_cnt;
+            sa = e->env_sa + sigev->sigev_signo;
+            nsa = e->env_sa + (sigev + 1)->sigev_signo;
+            stack -= 4;
+            *(void (**)(int)) stack = nsa->sa_handler;
+            stack -= 4;
+            *(int *) stack = sigev->sigev_value;
+            stack -= 4;
+            *(void (**)()) stack = sa->sa_restorer;
+        }
+        if (e->env_signo)
+        {
+            *e->env_signo = sigev->sigev_signo;
+            e->env_signo = 0;
+        }
+        e->env_tf.tf_rip = (uintptr_t) sa->sa_handler;
+        e->env_tf.tf_rsp = stack;
+    }
 
   env_pop_tf(&curenv->env_tf);
 
