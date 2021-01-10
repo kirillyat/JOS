@@ -34,7 +34,7 @@ USERAPPS :=	$(OBJDIR)/user/init \
 			$(OBJDIR)/user/vdate \
 			$(OBJDIR)/user/testfifo \
 			$(OBJDIR)/user/mkfifo \
-			$(OBJDIR)/user/i_love_yadro
+			$(OBJDIR)/user/i_love_yadro \
 			$(OBJDIR)/user/sigcount \
 			$(OBJDIR)/user/kill \
 
