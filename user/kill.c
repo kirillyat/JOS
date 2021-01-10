@@ -2,29 +2,34 @@
 #include <inc/env.h>
 #include <inc/signal.h>
 
-
-
-int my_atoi(char *p) {
-    int k = 0;
-    while (*p) {
-        k = (k << 3) + (k << 1) + (*p) - '0';
-        p++;
-     }
-     return k;
-}
-
 void
 umain(int argc, char **argv) 
 {
     binaryname = "kill";
-    if (argc < 2)
-		printf("No arguments\n");
-    else {    
-        envid_t dest_env = my_atoi(argv[1]);
-        int sig_no = (argc>2)? my_atoi(argv[2]):SIGKILL;
-        int value = (argc>3)? my_atoi(argv[3]):0;
-
-        sys_sigqueue(dest_env, sig_no, value);
-    }
-
+    int signo;
+    int value;
+    envid_t envid;
+    switch (argc)
+    {
+    case 1:
+    case 2:
+    cprintf("Usage: %s -[SIGNO] ([VALUE] [ENVID]) | [ENVID]\n", argv[0]);
+    cprintf("Send a signal to a process.\n");
+    break;
+    case 3:
+        signo = -strtol(argv[1], 0, 10);
+        if (signo < 0) break;
+        envid = strtol(argv[2], 0, 16);
+        sys_sigqueue(envid, signo, 0);
+        break;
+    case 4:
+        signo = -strtol(argv[1], 0, 10);
+        if (signo < 0) break;
+        value = strtol(argv[2], 0, 10);
+        envid = strtol(argv[3], 0, 16);
+        sys_sigqueue( envid, signo, value);
+        break;
+    default:
+        break;
+    };
 }

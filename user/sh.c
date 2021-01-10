@@ -123,11 +123,25 @@ again:
         break;
 
       case '&':
+  	    if ((r = fork()) == 0) {
+          // Child
+          cprintf("Child\n");
+          // Run the current command!
+          goto runit;
+          return;  // эта строка никогда не выполняется, существует для успокоения души
+	      } else {
+          //Parent
+          cprintf("Parent, fork: %d\n", r);
+          exit();
+          break;
+        }
+
+      
+    /*  case '&':
         cprintf("Starting new env in the background!\n");
         spawn(argv[0], (const char**) argv);
-        goto again;
-
-
+        goto runit;
+    */
       case 0: // String is complete
         // Run the current command!
         goto runit;
