@@ -2,6 +2,11 @@
 #include <inc/string.h>
 #include <inc/lib.h>
 
+#ifdef MIN
+#undef MIN
+#endif
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+
 #ifdef debug
 #undef debug
 #endif
@@ -113,13 +118,18 @@ devfifo_write(struct Fd *fd, const void *buf, size_t n)
 
 	if (n > (max = PGSIZE - (sizeof(int) + sizeof(size_t))))
 		n = max;
+    
+	int buf_size = sizeof(fsipcbuf_fifo.write_fifo.req_buf);
 
 	while(1){
 
 		fsipcbuf_fifo.write_fifo.req_fileid = fd->fd_file.id;
 		fsipcbuf_fifo.write_fifo.req_n = n - res;
-		memmove(fsipcbuf_fifo.write_fifo.req_buf, buf + res, n - res);
 
+		memmove(fsipcbuf_fifo.write_fifo.req_buf, 
+		        buf + res, 
+				MIN((n - res), buf_size));
+		
 		if ((r = fsipc_fifo(FSREQ_WRITE_FIFO, NULL)) < 0){
 			if (r == -E_FIFO){
 				res += fsipcbuf_fifo.writeRet.ret_n;
