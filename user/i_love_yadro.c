@@ -1,6 +1,6 @@
 #include <inc/lib.h>
 
-int n_read = 20;
+int n_read = 100;
 
 char buf[8192];
 
@@ -27,16 +27,20 @@ read_n_read(int f) {
 
 void
 umain(int argc, char **argv) {
-  int f, i;
+  int f;
 
   binaryname = "i_love_yadro";
-  for (i = 1; i < argc; i++) {
-      f = open(argv[i], O_RDONLY);
-      if (f < 0)
-        printf("can't open %s: %i\n", argv[i], f);
-      else {
-        read_n_read(f);
-        close(f);
-      }
-    }
+
+  if (argc < 2) {
+	printf("No arguments\n");
+    return;
+  }
+
+  f = open(argv[1], O_RDONLY);
+  if (f < 0)
+    printf("can't open %s: %i\n", argv[1], f);
+  else {
+    read_n_read(f);
+    close(f);
+  };
 }

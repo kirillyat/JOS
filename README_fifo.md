@@ -62,6 +62,10 @@ struct Stat {
  3. 
 ```
 $ mkfifo my_fifo2
+$ echo 123 > my_fifo2
+$ echo 456 > my_fifo2
 $ i_love_yadro my_fifo2 &
+>>> 123\n456
 $ echo qwerty > my_fifo2
+>>> qwerty
 ```
