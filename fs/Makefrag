@@ -35,6 +35,8 @@ USERAPPS :=	$(OBJDIR)/user/init \
 			$(OBJDIR)/user/testfifo \
 			$(OBJDIR)/user/mkfifo \
 			$(OBJDIR)/user/i_love_yadro
+			$(OBJDIR)/user/sigcount \
+			$(OBJDIR)/user/kill \
 
 
 FSIMGFILES := $(FSIMGTXTFILES) $(USERAPPS)

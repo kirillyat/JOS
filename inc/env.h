@@ -6,6 +6,7 @@
 #include <inc/types.h>
 #include <inc/trap.h>
 #include <inc/memlayout.h>
+#include <inc/signal.h>
 
 typedef int32_t envid_t;
 extern pml4e_t *kern_pml4e;
@@ -37,6 +38,7 @@ enum {
   ENV_DYING,
   ENV_RUNNABLE,
   ENV_RUNNING,
+  ENV_WAITING,
   ENV_NOT_RUNNABLE
 };
 
@@ -46,6 +48,12 @@ enum EnvType {
   ENV_TYPE_KERNEL,
   ENV_TYPE_USER,
   ENV_TYPE_FS, // File system server
+};
+
+enum SigFlags
+{
+    SIG_HANDLING = 1,
+    SIG_STOPPED  = 2
 };
 
 struct Env {
@@ -64,6 +72,13 @@ struct Env {
 
   // Exception handling
   void *env_pgfault_upcall; // Page fault upcall entry point
+
+  //IndTask Signal handling
+  struct sigaction env_sa[NSIGNALS];
+  int env_sigev_cnt;
+  struct sigevent env_sigev[64];
+  uint32_t env_sigflags;
+  int *env_signo;
 
   // Lab 9 IPC
   bool env_ipc_recving;   // Env is blocked receiving

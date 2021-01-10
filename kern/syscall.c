@@ -85,20 +85,18 @@ sys_exofork(void) {
   // will appear to return 0.
 
   // LAB 9: Your code here.
-  struct Env *e = NULL;
-  int res;
+      struct Env *e;
+      int err = env_alloc(&e, curenv->env_id);
+      if (err) return err;
+      e->env_status = ENV_NOT_RUNNABLE;
+      e->env_tf = curenv->env_tf;
+      e->env_tf.tf_regs.reg_rax = 0;
+      memcpy(e->env_sa, curenv->env_sa, NSIGNALS * sizeof(*e->env_sa));
+      e->env_sigev_cnt = 0;
+      e->env_sigflags = 0;
+      e->env_signo = 0;
+      return e->env_id;
 
-  if ((res = env_alloc(&e, curenv->env_id)) < 0) {
-    return res;
-  }
-
-  e->env_status = ENV_NOT_RUNNABLE;
-  e->env_tf = curenv->env_tf;
-  //e->env_pgfault_upcall = curenv->env_pgfault_upcall;
-
-  e->env_tf.tf_regs.reg_rax = 0;
-
-  return e->env_id; 
 }
 
 // Set envid's env_status to status, which must be ENV_RUNNABLE
@@ -406,6 +404,66 @@ sys_gettime(void) {
   return gettime();
 }
 
+static int
+sys_sigqueue(envid_t envid, int signo, int value)
+{
+    if (!envid && signo == -1 && !value)
+    {
+        curenv->env_sigflags &= ~SIG_HANDLING;
+        return 0;
+    }
+    struct Env *e;
+    int err = envid2env(envid, &e, 0);
+    if (err) return err;
+    if (e->env_sa[signo].sa_handler == SIG_IGN) return 0;
+    if (signo == SIGCONT) e->env_sigflags &= ~SIG_STOPPED;
+    if (e->env_sa[signo].sa_handler == SIG_DFL)
+    {
+        switch (signo)
+        {
+        case SIGCHLD:
+            return 0;
+        case SIGCONT:
+            e->env_sigflags &= ~SIG_STOPPED;
+            break;
+        case SIGSTOP:
+            e->env_status = ENV_WAITING;
+            e->env_sigflags |= SIG_STOPPED;
+            return 0;
+        default:
+            env_destroy(e);
+            return 0;
+        };
+    }
+    else
+    {
+        if (e->env_sigev_cnt == sizeof(e->env_sigev) / sizeof(*e->env_sigev))
+        {
+            return -E_NO_MEM;
+        }
+        struct sigevent sigev = {signo, value};
+        e->env_sigev[e->env_sigev_cnt++] = sigev;
+    }
+    if (e->env_status == ENV_WAITING && !(e->env_sigflags & SIG_STOPPED)) e->env_status = ENV_RUNNABLE;
+    return 0;
+}
+
+static int
+sys_sigwait(int *signo)
+{
+    curenv->env_status = ENV_WAITING;
+    curenv->env_signo = signo;
+    return 0;
+}
+
+static int
+sys_sigaction(int signo, struct sigaction *act)
+{
+    if (signo == SIGKILL || signo == SIGSTOP) return -E_INVAL;
+    curenv->env_sa[signo] = *act;
+    return 0;
+}
+
 // Dispatches to the correct kernel function, passing the arguments.
 uintptr_t
 syscall(uintptr_t syscallno, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4, uintptr_t a5) {
@@ -445,6 +503,12 @@ syscall(uintptr_t syscallno, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t
       return sys_ipc_recv((void *)a1);
     case SYS_gettime:
       return sys_gettime();
+    case SYS_sigqueue:
+        return sys_sigqueue(a1, a2, a3);
+    case SYS_sigwait:
+        return sys_sigwait((void *) a1);
+    case SYS_sigaction:
+        return sys_sigaction(a1, (void *) a2);
     default:
       return -E_INVAL;
   }

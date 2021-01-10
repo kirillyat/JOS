@@ -68,8 +68,14 @@ int sys_page_unmap(envid_t env, void *pg);
 int sys_ipc_try_send(envid_t to_env, uint64_t value, void *pg, int perm);
 int sys_ipc_recv(void *rcv_pg);
 int sys_gettime(void);
+int sys_sigqueue(envid_t envid, int signo, int value);
+int sys_sigwait(int *signo);
+int sys_sigaction(int signo, struct sigaction *act);
 
 int vsys_gettime(void);
+__attribute__((optimize("O0")))
+void vsys_sigreturn();
+
 
 // This must be inlined.  Exercise for reader: why?
 static __inline envid_t __attribute__((always_inline))
