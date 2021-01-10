@@ -58,3 +58,10 @@ struct Stat {
  >>> <ничто>
 ```
  2. `make grade`  (с кофигурацией lab 13, нужно переименовать g_rade-lab13 в grade-lab13)
+ 
+ 3. 
+```
+$ mkfifo my_fifo2
+$ i_love_yadro my_fifo2 &
+$ echo qwerty > my_fifo2
+```
