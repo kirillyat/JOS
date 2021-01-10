@@ -68,4 +68,7 @@ $ i_love_yadro my_fifo2 &
 >>> 123\n456
 $ echo qwerty > my_fifo2
 >>> qwerty
+$ kill -9 <магически угаданный номер процесса>
+$ echo qwerty > my_fifo2
+>>> <ничто>
 ```

@@ -136,7 +136,6 @@ again:
           break;
         }
 
-      
     /*  case '&':
         cprintf("Starting new env in the background!\n");
         spawn(argv[0], (const char**) argv);

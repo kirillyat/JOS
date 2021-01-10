@@ -5,7 +5,8 @@ void
 handler(int val)
 {
     cprintf("Receiving > %d\n", val);
-    for (int i = 0; i != val; ++i)
+    int i;
+    for (i = 0; i <= val; ++i)
     {
         cprintf("%d\n", i);
     }
