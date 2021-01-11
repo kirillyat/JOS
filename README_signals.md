@@ -33,7 +33,9 @@ sys_sigwait(int *signo)
 sys_sigaction(int signo, struct sigaction *act)
 ```
 
-* тестировать можно запустив программу sigcount и отправиь ей сигналы например через CTRL+C
+# тестировать 
+
+*можно запустив программу sigcount и отправиь ей сигналы например через CTRL+C
 
 * Kill -9 <номер процесса>
 
