@@ -13,10 +13,12 @@ handler(int val)
     return;
 }
 
+
 void
 umain(int argc, char **argv)
 {
     struct sigaction sa = {handler};
     sys_sigaction(SIG_test, &sa);
+    
     while (1) {}
 }
