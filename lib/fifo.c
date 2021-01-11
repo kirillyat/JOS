@@ -2,6 +2,11 @@
 #include <inc/string.h>
 #include <inc/lib.h>
 
+#ifdef MIN
+#undef MIN
+#endif
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+
 #ifdef debug
 #undef debug
 #endif
@@ -107,19 +112,20 @@ devfifo_read(struct Fd *fd, void *buf, size_t n)
 static ssize_t
 devfifo_write(struct Fd *fd, const void *buf, size_t n)
 {
-	uint32_t max;
 	int r;
 	int res = 0;
 
-	if (n > (max = PGSIZE - (sizeof(int) + sizeof(size_t))))
-		n = max;
+	int buf_size = sizeof(fsipcbuf_fifo.write_fifo.req_buf);
 
 	while(1){
 
 		fsipcbuf_fifo.write_fifo.req_fileid = fd->fd_file.id;
-		fsipcbuf_fifo.write_fifo.req_n = n - res;
-		memmove(fsipcbuf_fifo.write_fifo.req_buf, buf + res, n - res);
+		fsipcbuf_fifo.write_fifo.req_n = MIN((n - res), buf_size);
 
+		memmove(fsipcbuf_fifo.write_fifo.req_buf, 
+		        buf + res, 
+				MIN((n - res), buf_size));
+		
 		if ((r = fsipc_fifo(FSREQ_WRITE_FIFO, NULL)) < 0){
 			if (r == -E_FIFO){
 				res += fsipcbuf_fifo.writeRet.ret_n;
@@ -128,7 +134,7 @@ devfifo_write(struct Fd *fd, const void *buf, size_t n)
 				sys_yield();
 				continue;
 			} else if (r == -E_FIFO_CLOSE) {
-        // нет читателей, возвращаем все, что попало в канал
+                // нет читателей, возвращаем все, что попало в канал
 				cprintf("fifo buffer is full, %d bytes are written\n", res + fsipcbuf_fifo.writeRet.ret_n);
 				return res + fsipcbuf_fifo.writeRet.ret_n;
 			}
@@ -137,7 +143,9 @@ devfifo_write(struct Fd *fd, const void *buf, size_t n)
 		}
 
 		res += r;
-		break;
+		if (res == n){
+		  break;
+		}
 	}
 
 	return res;
